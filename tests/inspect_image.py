@@ -22,8 +22,10 @@ def main():
     print("boot sectors:", {k: list(v) for k, v in res.boot.items()})
     print("MFT records: %d   FAT dirs: %d   exFAT sets: %d" % (len(res.mft), len(res.fat_dirs), len(res.exfat_sets)))
     print("partition starts:", allocation.partition_starts(src))
-    alloc = allocation.current_allocation(src, print)
-    print("currently allocated:", human_size(alloc.total()))
+    print("partitions:", allocation.partitions(src))
+    print("accessible volumes at:", sorted(allocation.accessible_starts(src)))
+    alloc, unknown = allocation.current_allocation(src, print)
+    print("currently allocated:", human_size(alloc.total()), " not inspectable:", human_size(unknown.total()))
     vols = fat32.find_volumes(src, res, print) + exfat.find_volumes(src, res, print) + ntfs.find_volumes(src, res, print)
     for v in vols:
         print("\n%s volume at %d, cluster %d, notes %s" % (v.fs, v.start, v.cluster_size, v.notes))

@@ -33,12 +33,29 @@ The same engine is available from the command line:
 ```powershell
 .\.venv\Scripts\python -m recoverytool.cli --list
 .\.venv\Scripts\python -m recoverytool.cli --disk 1 --dest E:\Recovered
+.\.venv\Scripts\python -m recoverytool.cli --disk 1 --partition 2 --dest E:\Recovered
 .\.venv\Scripts\python -m recoverytool.cli --image stick.img --dest E:\Recovered
 .\.venv\Scripts\python -m recoverytool.cli --help
 ```
 
+`--list` prints every disk with its partitions and unallocated space. `--partition` limits the
+work to one partition, which is a lot faster than the whole disk; `--offset` and `--length` (in
+bytes) do the same for any region, for example the unallocated space `--list` shows.
+
 `--dest` has to be on a different disk than the one you are recovering. The tool checks this and
 stops if it is not.
+
+## Working on the interface without touching a disk
+
+```powershell
+$env:RECOVERYTOOL_FAKE_DISKS = "docs\demo-disks.json"
+.\.venv\Scripts\python run.py
+```
+
+With that variable set the app shows the made-up disks from the JSON file, does not query any
+real disk, and refuses every disk operation. It does not need an elevated prompt. Opening an
+image file still works, so the whole recovery flow can be exercised this way.
+`RECOVERYTOOL_LANG` (`en` or `tr`) forces the interface language.
 
 ## Build the exe
 
@@ -70,9 +87,22 @@ Two things to know before you hand the exe to someone:
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python tests\test_source.py       # no admin needed
-.\.venv\Scripts\python tests\test_scenarios.py    # needs admin, uses diskpart
+.\.venv\Scripts\python tests\test_source.py        # no admin needed
+.\.venv\Scripts\python tests\test_troubleshoot.py  # no admin needed
+.\.venv\Scripts\python tests\test_layouts.py       # no admin needed
+.\.venv\Scripts\python tests\test_scenarios.py     # needs admin, uses diskpart
 ```
+
+The first three work on files and a made-up disk list. `test_layouts.py` does more if you give it
+a disk image of your own (any image with a partition Windows can read):
+
+```powershell
+$env:RECOVERYTOOL_TEST_IMAGE = "D:\images\stick.img"
+.\.venv\Scripts\python tests\test_layouts.py
+```
+
+It opens the image read-only and damages it in memory only: wipes the partition table, pretends
+an ISO was written over it, and so on.
 
 `test_scenarios.py` creates small virtual disks, formats them, fills them with files, wrecks
 them and checks what comes back against the original hashes. It attaches and detaches virtual
@@ -145,11 +175,28 @@ Aynı motor komut satırından da kullanılabilir:
 ```powershell
 .\.venv\Scripts\python -m recoverytool.cli --list
 .\.venv\Scripts\python -m recoverytool.cli --disk 1 --dest E:\Kurtarilan
+.\.venv\Scripts\python -m recoverytool.cli --disk 1 --partition 2 --dest E:\Kurtarilan
 .\.venv\Scripts\python -m recoverytool.cli --image bellek.img --dest E:\Kurtarilan
 .\.venv\Scripts\python -m recoverytool.cli --help
 ```
 
+`--list` her diski bölümleri ve ayrılmamış alanlarıyla yazar. `--partition` işi tek bir bölümle
+sınırlar; tüm diske göre çok daha hızlıdır. `--offset` ve `--length` (bayt cinsinden) aynı şeyi
+herhangi bir alan için yapar, örneğin `--list` çıktısındaki ayrılmamış alan için.
+
 `--dest` kurtarılan diskten farklı bir diskte olmalı. Araç bunu kontrol eder, değilse durur.
+
+## Hiçbir diske dokunmadan arayüz üzerinde çalışmak
+
+```powershell
+$env:RECOVERYTOOL_FAKE_DISKS = "docs\demo-disks.json"
+.\.venv\Scripts\python run.py
+```
+
+Bu değişken ayarlıyken uygulama JSON dosyasındaki örnek diskleri gösterir, gerçek hiçbir diski
+sorgulamaz ve bütün disk işlemlerini reddeder. Yönetici olmak gerekmez. İmaj dosyası açmak yine
+çalışır; kurtarma akışının tamamı bu şekilde denenebilir. `RECOVERYTOOL_LANG` (`en` ya da `tr`)
+arayüz dilini zorlar.
 
 ## Exe derleme
 
@@ -182,9 +229,22 @@ Exe'yi birine vermeden önce bilmeniz gereken iki şey:
 ## Testler
 
 ```powershell
-.\.venv\Scripts\python tests\test_source.py       # yönetici gerekmez
-.\.venv\Scripts\python tests\test_scenarios.py    # yönetici ister, diskpart kullanır
+.\.venv\Scripts\python tests\test_source.py        # yönetici gerekmez
+.\.venv\Scripts\python tests\test_troubleshoot.py  # yönetici gerekmez
+.\.venv\Scripts\python tests\test_layouts.py       # yönetici gerekmez
+.\.venv\Scripts\python tests\test_scenarios.py     # yönetici ister, diskpart kullanır
 ```
+
+İlk üçü dosyalar ve örnek disk listesi üzerinde çalışır. `test_layouts.py`, kendi disk imajınızı
+verirseniz (Windows'un okuyabildiği bir bölüm içeren herhangi bir imaj) daha fazlasını sınar:
+
+```powershell
+$env:RECOVERYTOOL_TEST_IMAGE = "D:\imajlar\bellek.img"
+.\.venv\Scripts\python tests\test_layouts.py
+```
+
+İmajı salt okunur açar ve yalnızca bellekte bozar: bölüm tablosunu siler, üzerine ISO yazılmış
+gibi davranır vb.
 
 `test_scenarios.py` küçük sanal diskler oluşturur, biçimlendirir, dosyalarla doldurur, bozar ve
 geri gelenleri özgün özetlerle karşılaştırır. Bu sırada sanal diskleri onlarca kez takıp çıkarır.

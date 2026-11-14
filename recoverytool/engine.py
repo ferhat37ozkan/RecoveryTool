@@ -41,11 +41,11 @@ class RecoveryError(Exception):
 
 
 class _Item:
-    __slots__ = ("node", "volume", "category", "rel", "path", "status", "details", "sha", "bad", "magic")
+    __slots__ = ("node", "volume", "category", "rel", "path", "status", "details", "sha", "bad", "magic", "notes")
 
     def __init__(self, node, volume, category, rel, path):
         self.node, self.volume, self.category, self.rel, self.path = node, volume, category, rel, path
-        self.status, self.details, self.sha, self.bad, self.magic = "", [], "", [], None
+        self.status, self.details, self.sha, self.bad, self.magic, self.notes = "", [], "", [], None, []
 
 
 def long_path(p):
@@ -85,8 +85,11 @@ def set_metadata(path, ctime, atime, mtime, attrs, is_dir=False):
 
 
 class Engine:
-    def __init__(self, src, dest, options, emit, cancel):
+    def __init__(self, src, dest, options, emit, cancel, accessible=None):
+        """``accessible``: offsets of the volumes Windows can open right now.  None means "work
+        it out from the partition table", which is what an image file needs."""
         self.src, self.dest, self.opt, self.emit, self.cancel = src, dest, options, emit, cancel
+        self.accessible = accessible
         self.items = []
         self.skipped_live = 0
         self.volumes = []
@@ -105,6 +108,26 @@ class Engine:
     # -- pipeline -------------------------------------------------------------------------------
     def run(self):
         t0 = time.time()
+        total = self.analyze()
+        free = shutil.disk_usage(self.dest).free
+        if total + (64 << 20) > free:
+            raise RecoveryError(t("err_space", need=human_size(total), free=human_size(free)))
+
+        self.phase("ph_recover")
+        self.extract(total)
+        self.phase("ph_verify")
+        self.verify()
+        self.phase("ph_report")
+        summary = self.report(time.time() - t0)
+        if self.src.bad_bytes:
+            self.log(t("log_bad", size=human_size(self.src.bad_bytes)))
+        return summary
+
+    def analyze(self):
+        """Scan, rebuild the volumes and decide what will be recovered. Writes nothing.
+
+        Returns the number of bytes the recovery will need in the destination.
+        """
         self.phase("ph_scan")
         res = scanner.scan(self.src, lambda d, tot: self.emit("progress", done=d, total=tot, unit="bytes"), self.cancel)
         self.log(t("log_scan_done", mft=len(res.mft), fat=len(res.fat_dirs), exfat=len(res.exfat_sets),
@@ -118,29 +141,23 @@ class Engine:
             self.volumes += finder(self.src, res, dbg)
         self.volumes += ntfs.find_volumes(self.src, res, dbg, self.cancel)
         self.check()
-        alloc = allocation.current_allocation(self.src, dbg)
+        alloc, unknown = allocation.current_allocation(self.src, dbg)
+        accessible = self.accessible if self.accessible is not None else allocation.accessible_starts(self.src)
         for v in self.volumes:
+            if v.start not in accessible:
+                # A filesystem nobody can open any more (lost partition, damaged boot sector):
+                # none of its files are "still accessible", however healthy it looks inside.
+                unlive(v)
             files, dirs = v.count()
             self.log(t("log_volume", fs=v.fs, files=files, dirs=dirs))
 
         self.plan()
+        self.mark_overlaps(alloc, unknown)
         if not self.items:
             self.log(t("log_nothing"))
         total = sum(i.node.size for i in self.items if not i.node.is_dir)
         self.log(t("log_plan", n=sum(1 for i in self.items if not i.node.is_dir), size=human_size(total)))
-        free = shutil.disk_usage(self.dest).free
-        if total + (64 << 20) > free:
-            raise RecoveryError(t("err_space", need=human_size(total), free=human_size(free)))
-
-        self.phase("ph_recover")
-        self.extract(alloc, total)
-        self.phase("ph_verify")
-        self.verify()
-        self.phase("ph_report")
-        summary = self.report(time.time() - t0)
-        if self.src.bad_bytes:
-            self.log(t("log_bad", size=human_size(self.src.bad_bytes)))
-        return summary
+        return total
 
     # -- planning -------------------------------------------------------------------------------
     def plan(self):
@@ -215,7 +232,26 @@ class Engine:
                     used_top.discard(name.lower())
 
     # -- extraction -----------------------------------------------------------------------------
-    def extract(self, alloc, total):
+    def mark_overlaps(self, alloc, unknown):
+        """Which bytes of each lost file does something newer sit on?"""
+        for it in self.items:
+            n = it.node
+            if n.is_dir or n.live:
+                continue
+            pos, maybe = 0, 0
+            for off, ln in n.extents:
+                if off is not None:
+                    if alloc:
+                        it.bad += [(pos + s - off, pos + e - off) for s, e in alloc.overlaps(off, ln)]
+                    if unknown:
+                        maybe += sum(e - s for s, e in unknown.overlaps(off, ln))
+                pos += ln
+            if it.bad:
+                it.notes.append("OVERWRITTEN:%d/%d" % (sum(e - s for s, e in it.bad), n.size))
+            if maybe:
+                it.notes.append("MAYBE_OVERWRITTEN:%d/%d" % (maybe, n.size))
+
+    def extract(self, total):
         done = 0
         dirs = [i for i in self.items if i.node.is_dir]
         for it in dirs:
@@ -229,7 +265,7 @@ class Engine:
             if n.is_dir:
                 continue
             self.check()
-            self.extract_one(it, alloc)
+            self.extract_one(it)
             done += n.size
             now = time.time()
             if now - last > 0.1:
@@ -240,9 +276,9 @@ class Engine:
             n = it.node
             set_metadata(long_path(it.path), n.ctime, n.atime, n.mtime, n.attrs, True)
 
-    def extract_one(self, it, alloc):
+    def extract_one(self, it):
         n, src = it.node, self.src
-        it.details = list(n.flags)
+        it.details = list(n.flags) + it.notes
         if "COMPRESSED" in n.flags:
             it.status = UNSUPPORTED
             return
@@ -254,14 +290,6 @@ class Engine:
             it.status = SKIPPED
             it.details.append("NO_DATA_LOCATION")
             return
-        if not n.live and alloc:                        # which bytes did a newer filesystem take?
-            pos = 0
-            for off, ln in n.extents:
-                if off is not None:
-                    it.bad += [(pos + s - off, pos + e - off) for s, e in alloc.overlaps(off, ln)]
-                pos += ln
-            if it.bad:
-                it.details.append("OVERWRITTEN:%d/%d" % (sum(e - s for s, e in it.bad), n.size))
         sha, head, written, bad_before = hashlib.sha256(), b"", 0, src.bad_bytes
         try:
             os.makedirs(long_path(os.path.dirname(it.path)), exist_ok=True)
@@ -355,6 +383,8 @@ class Engine:
                 it.status = DAMAGED
             elif (it.node.deleted or "CHAIN_GUESSED" in flags) and not proven and it.node.size:
                 it.status = UNCERTAIN
+            elif "MAYBE_OVERWRITTEN" in flags and id(it) not in archive_ok:
+                it.status = UNCERTAIN       # under a partition we cannot inspect; a header check is not proof
             else:
                 it.status = OK
         if self.opt.twin_repair:
@@ -467,6 +497,19 @@ class Engine:
         return summary
 
 
+def unlive(volume):
+    """Mark every node of a volume as not belonging to an accessible filesystem."""
+    stack, seen = [volume.root, volume.orphans], set()
+    while stack:
+        n = stack.pop()
+        if id(n) in seen:
+            continue
+        seen.add(id(n))
+        n.live = False
+        if n.is_dir:
+            stack.extend(n.children)
+
+
 def format_duration(sec):
     sec = int(sec)
     return "%d:%02d:%02d" % (sec // 3600, sec % 3600 // 60, sec % 60)
@@ -495,8 +538,15 @@ def run_recovery(source, dest, options, emit, cancel):
 
     ``source`` is a disk dict from ``disks.list_disks()`` or ``{"image": path}``.
     The disk is write-protected for the duration and the protection is always released again.
+
+    A disk dict may carry ``"region": {"offset", "size", "label", "filesystem"}`` to restrict
+    the work to one partition or one stretch of unallocated space.  Only that window is
+    scanned, which is much faster than scanning the whole disk.
     """
     is_disk = "number" in source
+    region = source.get("region")
+    if is_disk and disks.fake_mode():
+        raise RecoveryError(t("err_demo"))
     os.makedirs(dest, exist_ok=True)
     if is_disk:
         all_disks = disks.list_disks()
@@ -516,20 +566,33 @@ def run_recovery(source, dest, options, emit, cancel):
                     emit("log", text=t("log_lock_failed", err=err))
         if is_disk:
             label = "Disk %d - %s (%s)" % (source["number"], source.get("name", ""), human_size(source["size"]))
-            src = Source(source["path"], source["size"], source.get("sector") or 512, label)
+            if region:
+                label += " / %s (%s)" % (region.get("label", ""), human_size(region["size"]))
+                src = Source(source["path"], region["size"], source.get("sector") or 512, label, base=region["offset"])
+                # the window starts at the partition: it is accessible only if Windows reads it
+                accessible = {0} if region.get("filesystem") else set()
+            else:
+                src = Source(source["path"], source["size"], source.get("sector") or 512, label)
+                accessible = {p["offset"] for p in source.get("partitions", ()) if p.get("filesystem")}
+        elif region:
+            src = Source(source["image"], region["size"], label="%s @ %d" % (source["image"], region["offset"]),
+                         base=region["offset"])
+            accessible = None
         else:
             src = Source(source["image"], label=source["image"])
+            accessible = None
         if options.image_first and is_disk:
             free = shutil.disk_usage(dest).free
             if src.size + (64 << 20) > free:
                 raise RecoveryError(t("err_space", need=human_size(src.size), free=human_size(free)))
             emit("phase", key="ph_image", text=t("ph_image"))
-            image = create_image(src, os.path.join(dest, "disk-%d.img" % source["number"]), emit, cancel)
+            image = create_image(src, os.path.join(dest, "disk-%d%s.img" % (
+                source["number"], "-part" if region else "")), emit, cancel)
             bad = src.bad_bytes
             src.close()
             src = Source(image, label=label)
             src.bad_bytes = bad
-        return Engine(src, dest, options, emit, cancel).run()
+        return Engine(src, dest, options, emit, cancel, accessible).run()
     except SourceLost:
         raise RecoveryError(t("err_source_lost")) from None
     finally:

@@ -158,7 +158,7 @@ def undo_trim(before, after):
     from recoverytool import allocation
     from recoverytool.source import Source
     src = Source(after)
-    alloc = allocation.current_allocation(src)
+    alloc, _ = allocation.current_allocation(src)
     src.close()
     restored, step = 0, 1 << 20
     with open(before, "rb") as a, open(after, "r+b") as b:

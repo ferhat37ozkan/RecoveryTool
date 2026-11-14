@@ -135,6 +135,167 @@ STRINGS = {
 }
 
 
+STRINGS.update({
+    # --- disk tree ---
+    "col_item": ("Disk / partition", "Disk / bölüm"),
+    "col_label": ("Model / label", "Model / etiket"),
+    "col_type": ("Type", "Tür"),
+    "col_fs": ("Layout / FS", "Düzen / DS"),
+    "partition_n": ("Partition {n}", "Bölüm {n}"),
+    "unallocated": ("Unallocated", "Ayrılmamış alan"),
+    "gap_hint": ("a lost partition may be here", "kayıp bölüm burada olabilir"),
+    "raw_hint": ("filesystem not recognised", "dosya sistemi tanınmıyor"),
+    "st_healthy": ("Healthy", "Sağlıklı"),
+    "st_no_media": ("No media", "Ortam yok"),
+    "st_free": ("{free} free", "{free} boş"),
+    "troubleshoot": ("Troubleshoot", "Sorun giderici"),
+    "sel_whole": ("whole disk", "diskin tamamı"),
+    "err_demo": ("This is a demo disk list. Recovery and disk operations are disabled.",
+                 "Bu bir örnek disk listesi. Kurtarma ve disk işlemleri devre dışı."),
+    "busy_no_action": ("Not while a recovery is running.", "Kurtarma sürerken yapılamaz."),
+    # --- context menu ---
+    "m_recover_disk": ("Recover from the whole disk", "Diskin tamamından kurtar"),
+    "m_recover_part": ("Recover only this partition", "Yalnızca bu bölümden kurtar"),
+    "m_recover_gap": ("Search this space for a lost partition", "Bu alanda kayıp bölüm ara"),
+    "m_online": ("Bring online", "Çevrimiçi yap"),
+    "m_offline": ("Take offline", "Çevrimdışı yap"),
+    "m_readonly_on": ("Make read-only", "Salt okunur yap"),
+    "m_readonly_off": ("Remove read-only", "Salt okunuru kaldır"),
+    "m_letter": ("Assign / change drive letter…", "Sürücü harfi ata / değiştir…"),
+    "m_letter_remove": ("Remove drive letter", "Sürücü harfini kaldır"),
+    "m_explore": ("Open in Explorer", "Gezgin'de aç"),
+    "m_check": ("Check filesystem (read-only)", "Dosya sistemini denetle (salt okunur)"),
+    "m_repair": ("Repair filesystem…", "Dosya sistemini onar…"),
+    "m_props": ("Properties", "Özellikler"),
+    "m_remove_image": ("Remove from list", "Listeden kaldır"),
+    # --- dialogs ---
+    "letter_title": ("Drive letter", "Sürücü harfi"),
+    "letter_prompt": ("Drive letter for {name}:", "{name} için sürücü harfi:"),
+    "letter_none": ("No free drive letter.", "Boş sürücü harfi yok."),
+    "ok": ("OK", "Tamam"),
+    "close": ("Close", "Kapat"),
+    "c_offline": ("Take Disk {n} offline? Its volumes disappear from Windows until it is brought online again.",
+                  "Disk {n} çevrimdışı yapılsın mı? Yeniden çevrimiçi yapılana kadar birimleri Windows'ta görünmez."),
+    "c_readonly_on": ("Make Disk {n} read-only? Nothing can be written to it until this is removed.",
+                      "Disk {n} salt okunur yapılsın mı? Bu kaldırılana kadar diske hiçbir şey yazılamaz."),
+    "c_letter_remove": ("Remove the drive letter {letter}: from this partition? The data stays; the partition just "
+                        "stops showing up in Explorer.",
+                        "Bu bölümden {letter}: harfi kaldırılsın mı? Veriler yerinde kalır; bölüm yalnızca Gezgin'de "
+                        "görünmez olur."),
+    "c_repair": ("Repairing WRITES to the volume. Windows may delete or truncate damaged files while fixing the "
+                 "filesystem, and what it changes cannot be recovered afterwards.\n\nIf there is anything on {name} "
+                 "you want back, recover it first and repair afterwards.\n\nRepair now?",
+                 "Onarım birime YAZAR. Windows dosya sistemini düzeltirken hasarlı dosyaları silebilir ya da "
+                 "kırpabilir ve değiştirdiği şeyler sonradan kurtarılamaz.\n\n{name} üzerinde geri almak istediğiniz "
+                 "bir şey varsa önce kurtarın, sonra onarın.\n\nŞimdi onarılsın mı?"),
+    "act_working": ("{what}…", "{what}…"),
+    "act_done": ("{what}: done.", "{what}: tamamlandı."),
+    "act_failed": ("{what}: failed. {err}", "{what}: başarısız. {err}"),
+    "check_clean": ("No filesystem errors found on {name}.", "{name} üzerinde dosya sistemi hatası bulunmadı."),
+    "check_errors": ("Filesystem errors were found on {name}. Recover your files first, then use 'Repair filesystem'.",
+                     "{name} üzerinde dosya sistemi hataları bulundu. Önce dosyalarınızı kurtarın, sonra 'Dosya "
+                     "sistemini onar'ı kullanın."),
+    "p_disk": ("Disk {n}\nModel: {name}\nSerial: {serial}\nConnection: {bus}\nSize: {size}\nSector size: {sector}\n"
+               "Partition layout: {style}\nStatus: {status}\nHealth: {health}\nRead-only: {ro}\nOffline: {off}",
+               "Disk {n}\nModel: {name}\nSeri no: {serial}\nBağlantı: {bus}\nBoyut: {size}\nSektör boyutu: {sector}\n"
+               "Bölüm düzeni: {style}\nDurum: {status}\nSağlık: {health}\nSalt okunur: {ro}\nÇevrimdışı: {off}"),
+    "p_part": ("Partition {n} on Disk {d}\nDrive letter: {letter}\nLabel: {label}\nFilesystem: {fs}\nType: {type}\n"
+               "Size: {size}\nFree: {free}\nStarts at: {offset}\nHealth: {health}",
+               "Disk {d} üzerinde Bölüm {n}\nSürücü harfi: {letter}\nEtiket: {label}\nDosya sistemi: {fs}\nTür: {type}\n"
+               "Boyut: {size}\nBoş: {free}\nBaşlangıç: {offset}\nSağlık: {health}"),
+    "yes": ("yes", "evet"),
+    "no": ("no", "hayır"),
+    # --- troubleshooter ---
+    "ts_title": ("Troubleshooter - Disk {n}  {name}", "Sorun giderici - Disk {n}  {name}"),
+    "ts_recheck": ("Check again", "Yeniden incele"),
+    "ts_loading": ("Reading health counters…", "Sağlık sayaçları okunuyor…"),
+    "ts_nothing": ("Select a disk first.", "Önce bir disk seçin."),
+    "b_online": ("Bring online", "Çevrimiçi yap"),
+    "b_clear_readonly": ("Remove read-only", "Salt okunuru kaldır"),
+    "b_assign_letter": ("Assign a letter", "Harf ata"),
+    "b_check": ("Check filesystem", "Dosya sistemini denetle"),
+    "b_recover": ("Select for recovery", "Kurtarma için seç"),
+    "b_recover_region": ("Select for recovery", "Kurtarma için seç"),
+    "ts_healthy": ("No problems found", "Sorun bulunamadı"),
+    "ts_healthy_d": ("Windows reports this disk and its volumes as healthy. If files are missing anyway, they were "
+                     "probably deleted or the volume was formatted: select the disk or the partition and start a "
+                     "recovery.",
+                     "Windows bu diski ve birimlerini sağlıklı bildiriyor. Yine de dosyalar eksikse büyük olasılıkla "
+                     "silinmiş ya da birim biçimlendirilmiştir: diski ya da bölümü seçip kurtarma başlatın."),
+    "ts_no_media": ("The device answers but shows no storage", "Aygıt yanıt veriyor ama depolama alanı göstermiyor"),
+    "ts_no_media_d": ("Size is 0 and Windows says 'No media'. For a card reader this just means no card is inserted. "
+                      "For a USB stick or disk it means the controller cannot reach its memory: a hardware or firmware "
+                      "fault. No software on this computer can fix it or read data from it. Try another port and "
+                      "another computer; if it is the same there, only a recovery lab can help.",
+                      "Boyut 0 ve Windows 'Ortam yok' diyor. Kart okuyucuda bu yalnızca kart takılı olmadığı anlamına "
+                      "gelir. USB bellek ya da diskte ise denetleyicinin belleğine ulaşamadığını gösterir: donanım ya "
+                      "da firmware arızası. Bu bilgisayardaki hiçbir yazılım bunu düzeltemez ya da veriyi okuyamaz. "
+                      "Başka bir girişte ve başka bir bilgisayarda deneyin; orada da aynıysa yalnızca kurtarma "
+                      "laboratuvarı yardımcı olabilir."),
+    "ts_offline": ("The disk is offline", "Disk çevrimdışı"),
+    "ts_offline_d": ("Windows knows the disk but keeps it offline, so its volumes are hidden. This is a setting, not "
+                     "damage, and bringing it online does not change the data.",
+                     "Windows diski tanıyor ama çevrimdışı tutuyor; bu yüzden birimleri gizli. Bu bir ayardır, hasar "
+                     "değildir; çevrimiçi yapmak veriyi değiştirmez."),
+    "ts_readonly": ("The disk is write-protected", "Disk yazmaya karşı korumalı"),
+    "ts_readonly_d": ("Nothing can be written to this disk. RecoveryTool sets this during a recovery and removes it "
+                      "afterwards; if a run was interrupted it can be left on. Remove it only when you are done "
+                      "recovering from this disk.",
+                      "Bu diske hiçbir şey yazılamaz. RecoveryTool kurtarma sırasında bunu açar ve sonunda kaldırır; "
+                      "işlem yarıda kaldıysa açık kalmış olabilir. Yalnızca bu diskten kurtarma işiniz bittiyse "
+                      "kaldırın."),
+    "ts_unhealthy": ("Windows reports the disk as {state}", "Windows diski {state} olarak bildiriyor"),
+    "ts_unhealthy_d": ("The disk itself is reporting trouble. Copy what you need off it now, before anything else. "
+                       "Use the 'create a disk image first' option so the disk is read only once.",
+                       "Diskin kendisi sorun bildiriyor. Başka bir şey yapmadan önce ihtiyacınız olanı hemen "
+                       "kopyalayın. Disk yalnızca bir kez okunsun diye 'önce disk imajı al' seçeneğini kullanın."),
+    "ts_io_errors": ("{n} uncorrectable read/write errors", "{n} düzeltilemeyen okuma/yazma hatası"),
+    "ts_io_errors_d": ("The disk has sectors it can no longer read or write. This gets worse with use. Recover your "
+                       "data with the image option and replace the disk.",
+                       "Diskte artık okunamayan ya da yazılamayan sektörler var. Kullandıkça kötüleşir. Verinizi imaj "
+                       "seçeneğiyle kurtarın ve diski değiştirin."),
+    "ts_worn": ("The drive is {wear}% worn", "Sürücü %{wear} yıpranmış"),
+    "ts_worn_d": ("Flash storage wears out with writes and this drive is close to its rated life. Back it up.",
+                  "Flash bellek yazdıkça yıpranır ve bu sürücü ömrünün sonuna yakın. Yedeğini alın."),
+    "ts_hot": ("The drive is at {temp} °C", "Sürücü {temp} °C sıcaklıkta"),
+    "ts_hot_d": ("That is hot enough to cause errors. Improve cooling before a long scan.",
+                 "Bu sıcaklık hatalara yol açabilir. Uzun bir taramadan önce soğutmayı iyileştirin."),
+    "ts_no_partition_table": ("No partition table", "Bölüm tablosu yok"),
+    "ts_no_partition_table_d": ("Windows sees the disk as empty (RAW) and will offer to initialise it. Do not: "
+                                "initialising writes a new table over the old one. If the disk held data, the "
+                                "filesystems are very likely still there; recover from the whole disk.",
+                                "Windows diski boş (RAW) görüyor ve başlatmayı teklif edecek. Kabul etmeyin: başlatma "
+                                "eski tablonun üzerine yenisini yazar. Diskte veri vardıysa dosya sistemleri büyük "
+                                "olasılıkla hâlâ yerinde; diskin tamamından kurtarın."),
+    "ts_partition_raw": ("Partition {n} ({name}) has no readable filesystem",
+                         "Bölüm {n} ({name}) üzerinde okunabilir dosya sistemi yok"),
+    "ts_partition_raw_d": ("Windows calls this RAW and asks to format it. Do not format. Usually only the boot "
+                           "sector or part of the metadata is damaged and the files are still there. Select just "
+                           "this partition and recover; it is much faster than scanning the whole disk.",
+                           "Windows buna RAW der ve biçimlendirmek ister. Biçimlendirmeyin. Çoğu zaman yalnızca "
+                           "önyükleme sektörü ya da meta verinin bir kısmı bozuktur ve dosyalar yerindedir. Yalnızca "
+                           "bu bölümü seçip kurtarın; tüm diski taramaktan çok daha hızlıdır."),
+    "ts_volume_unhealthy": ("Partition {n} ({name}) is reported as {state}",
+                            "Bölüm {n} ({name}) {state} olarak bildiriliyor"),
+    "ts_volume_unhealthy_d": ("The filesystem has errors. A read-only check tells you how bad it is without changing "
+                              "anything. Recover important files before letting Windows repair it.",
+                              "Dosya sisteminde hatalar var. Salt okunur denetim hiçbir şeyi değiştirmeden durumun "
+                              "ciddiyetini gösterir. Windows'un onarmasına izin vermeden önce önemli dosyaları "
+                              "kurtarın."),
+    "ts_no_letter": ("Partition {n} ({name}, {fs}) has no drive letter", "Bölüm {n} ({name}, {fs}) için sürücü harfi yok"),
+    "ts_no_letter_d": ("The filesystem is fine but without a letter it does not appear in Explorer. Assigning one "
+                       "does not touch the data.",
+                       "Dosya sistemi sağlam ama harfi olmadığı için Gezgin'de görünmüyor. Harf atamak veriye "
+                       "dokunmaz."),
+    "ts_unallocated": ("{size} of the disk is not assigned to any partition",
+                       "Diskin {size} kadarı hiçbir bölüme ait değil"),
+    "ts_unallocated_d": ("If a partition used to be here and vanished (deleted, or the table was overwritten), its "
+                         "files are probably still in this space. Search just this space.",
+                         "Burada daha önce bir bölüm vardıysa ve kaybolduysa (silindi ya da tablo ezildi), dosyaları "
+                         "büyük olasılıkla hâlâ bu alandadır. Yalnızca bu alanı tarayın."),
+})
+
+
 def set_language(code):
     global _LANG
     _LANG = "tr" if str(code).lower().startswith("tr") else "en"

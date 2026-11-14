@@ -20,12 +20,18 @@ class SourceLost(Exception):
 class Source:
     _failures = 0
 
-    def __init__(self, path, size=None, sector=512, label=None):
+    def __init__(self, path, size=None, sector=512, label=None, base=0):
+        """``base``/``size`` select a window (one partition, or a stretch of unallocated space).
+
+        Everything else in the project addresses the source relative to that window, so a
+        partition is handled exactly like a small disk that starts with its boot sector.
+        """
         self.path = path
         self.is_device = path.startswith("\\\\.\\")
         self.sector = sector or 512
+        self.base = base
         self._f = open(path, "rb", buffering=0)
-        self.size = size if size else os.path.getsize(path)
+        self.size = size if size else os.path.getsize(path) - base
         self.label = label or path
         self.bad_bytes = 0
         self._cache = OrderedDict()
@@ -38,7 +44,7 @@ class Source:
 
     # -- low level -------------------------------------------------------------------------
     def _read_exact(self, off, n):
-        self._f.seek(off)
+        self._f.seek(self.base + off)
         chunks, got = [], 0
         while got < n:
             b = self._f.read(n - got)

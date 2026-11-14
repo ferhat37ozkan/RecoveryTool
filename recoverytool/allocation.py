@@ -1,9 +1,13 @@
-"""What the *current* filesystems on the source occupy.
+"""What is on the source *now*: the current partitions and the space they occupy.
 
-After a format the new filesystem writes its own metadata over part of the old data.  Old
-files that overlap those areas cannot be intact, and deleted files whose space has been
-reused are damaged as well.  This module returns the occupied byte ranges so the extractor can
-tell exactly which files - and which bytes of them - are affected.
+After a format - or after an image was written over a disk by mistake - something new sits on
+top of part of the old data.  Old files that overlap it cannot be intact, and deleted files
+whose space has been reused are damaged as well.  This module answers three questions:
+
+* ``partitions(src)``          which partitions does the current partition table describe?
+* ``accessible_starts(src)``   which of them hold a filesystem that can simply be opened?
+* ``current_allocation(src)``  which byte ranges are certainly occupied by current data, and
+                               which ranges belong to something we cannot look inside?
 """
 
 from __future__ import annotations
@@ -15,43 +19,76 @@ from . import ntfs
 from .model import Intervals
 
 
-def partition_starts(src):
-    """Offsets where a current filesystem may begin: offset 0 plus every MBR/GPT partition."""
-    starts = {0}
+def partitions(src):
+    """Return [(start, size)] in bytes for every MBR/GPT partition. Offset 0 is not included."""
+    out = []
     s = src.sector
     mbr = src.read(0, 512)
-    if len(mbr) == 512 and mbr[510:512] == b"\x55\xaa":
-        gpt = False
-        for i in range(4):
-            e = mbr[446 + 16 * i:462 + 16 * i]
-            ptype, lba = e[4], struct.unpack("<I", e[8:12])[0]
-            if ptype == 0xEE:
-                gpt = True
-            elif ptype and lba:
-                starts.add(lba * s)
-                if ptype in (0x05, 0x0F):                     # extended: walk the logical chain
-                    base = nxt = lba
-                    for _ in range(64):
-                        ebr = src.read(nxt * s, 512)
-                        if len(ebr) < 512 or ebr[510:512] != b"\x55\xaa":
-                            break
-                        l1 = struct.unpack("<I", ebr[454:458])[0]
-                        if ebr[450] and l1:
-                            starts.add((nxt + l1) * s)
-                        l2 = struct.unpack("<I", ebr[470:474])[0]
-                        if not ebr[466] or not l2:
-                            break
-                        nxt = base + l2
-        if gpt:
-            hdr = src.read(s, 92)
-            if hdr[:8] == b"EFI PART":
-                lba, count, esize = struct.unpack("<QII", hdr[72:88])
+    if len(mbr) < 512 or mbr[510:512] != b"\x55\xaa":
+        return out
+    gpt = False
+    for i in range(4):
+        e = mbr[446 + 16 * i:462 + 16 * i]
+        ptype, lba, count = e[4], struct.unpack("<I", e[8:12])[0], struct.unpack("<I", e[12:16])[0]
+        if ptype == 0xEE:
+            gpt = True
+        elif ptype in (0x05, 0x0F) and lba:                   # extended: walk the logical chain
+            base = nxt = lba
+            for _ in range(64):
+                ebr = src.read(nxt * s, 512)
+                if len(ebr) < 512 or ebr[510:512] != b"\x55\xaa":
+                    break
+                l1, c1 = struct.unpack("<II", ebr[454:462])
+                if ebr[450] and l1:
+                    out.append(((nxt + l1) * s, c1 * s))
+                l2 = struct.unpack("<I", ebr[470:474])[0]
+                if not ebr[466] or not l2:
+                    break
+                nxt = base + l2
+        elif ptype and count:
+            out.append((lba * s, count * s))
+    if gpt:
+        hdr = src.read(s, 92)
+        if hdr[:8] == b"EFI PART":
+            lba, count, esize = struct.unpack("<QII", hdr[72:88])
+            if 128 <= esize <= 512:
                 table = src.read(lba * s, min(count, 256) * esize)
                 for i in range(min(count, 256)):
                     e = table[i * esize:(i + 1) * esize]
                     if len(e) >= 48 and any(e[:16]):
-                        starts.add(struct.unpack("<Q", e[32:40])[0] * s)
-    return sorted(x for x in starts if x < src.size)
+                        first, last = struct.unpack("<QQ", e[32:48])
+                        if last >= first:
+                            out.append((first * s, (last - first + 1) * s))
+    return sorted(p for p in set(out) if 0 <= p[0] < src.size)
+
+
+def partition_starts(src):
+    """Offsets where a current filesystem may begin: offset 0 plus every partition."""
+    return sorted({0} | {p[0] for p in partitions(src)})
+
+
+def boot_kind(src, start):
+    """Which filesystem does the boot sector at ``start`` announce? None if not one we read."""
+    b = src.read(start, 512)
+    if len(b) < 512 or b[510:512] != b"\x55\xaa":
+        return None
+    if b[3:11] == b"NTFS    ":
+        return "NTFS"
+    if b[3:11] == b"EXFAT   ":
+        return "exFAT"
+    if b[0x52:0x5A] == b"FAT32   ":
+        return "FAT32"
+    return None
+
+
+def accessible_starts(src):
+    """Volumes the current partition table points at and whose boot sector is valid.
+
+    Only files of such a volume count as "still accessible normally".  A healthy filesystem
+    that is no longer listed in the partition table - a lost partition - is not accessible, and
+    its files have to be recovered like any other lost data.
+    """
+    return {start for start in partition_starts(src) if boot_kind(src, start)}
 
 
 def _ntfs(src, start, b):
@@ -145,24 +182,87 @@ def _exfat(src, start, b):
     return out
 
 
+def _iso9660_end(src):
+    """Size of an ISO 9660 image written to the start of the source (0 if there is none).
+
+    Writing a Linux or Windows installer image "raw" to a disk puts an ISO filesystem at offset
+    0.  Its primary volume descriptor says how many bytes the image covers; all of that was
+    overwritten.
+    """
+    pvd = src.read(0x8000, 2048)
+    if len(pvd) < 2048 or pvd[0] != 1 or pvd[1:6] != b"CD001":
+        return 0
+    blocks = struct.unpack("<I", pvd[80:84])[0]
+    block_size = struct.unpack("<H", pvd[128:130])[0]
+    if block_size not in (512, 1024, 2048, 4096):
+        return 0
+    return min(blocks * block_size, src.size)
+
+
 def current_allocation(src, log=lambda m: None):
-    ranges = []
+    """Return ``(occupied, unknown)`` as two Intervals.
+
+    ``occupied``  byte ranges that current data certainly sits on.
+    ``unknown``   current partitions holding something this tool cannot read (ext4, a boot
+                  partition of an installer image, ...).  Old data under them may or may not
+                  have been overwritten.
+    """
+    occupied, unknown = [], []
+    iso_end = _iso9660_end(src)
+    if iso_end:
+        occupied.append((0, iso_end))
+        log("ISO 9660 image at the start of the source covers %d bytes" % iso_end)
+    known = {}
     for start in partition_starts(src):
         b = src.read(start, 512)
-        if len(b) < 512 or b[510:512] != b"\x55\xaa":
+        kind = boot_kind(src, start)
+        if not kind:
             continue
         try:
-            if b[3:11] == b"NTFS    ":
-                part = _ntfs(src, start, b)
-            elif b[3:11] == b"EXFAT   ":
-                part = _exfat(src, start, b)
-            elif b[0x52:0x5A] == b"FAT32   ":
-                part = _fat32(src, start, b)
-            else:
-                continue
+            part = {"NTFS": _ntfs, "exFAT": _exfat, "FAT32": _fat32}[kind](src, start, b)
         except Exception as ex:                               # a damaged current FS must not stop recovery
             log("allocation map failed at %d: %s" % (start, ex))
             continue
-        log("current filesystem at %d occupies %d ranges" % (start, len(part)))
-        ranges += part
-    return Intervals(ranges)
+        known[start] = True
+        log("current %s filesystem at %d occupies %d ranges" % (kind, start, len(part)))
+        occupied += part
+    for start, size in partitions(src):
+        if start in known or start + size <= iso_end:
+            continue
+        kind = foreign_kind(src, start)
+        if not kind:
+            continue      # empty, or the damaged remains of the very filesystem being recovered
+        unknown.append((max(start, iso_end), min(start + size, src.size)))
+        log("%s partition at %d (%d bytes) cannot be inspected" % (kind, start, size))
+    return Intervals(occupied), Intervals(unknown)
+
+
+def foreign_kind(src, start):
+    """Positively identify a filesystem this tool does not read. None if it is not one of them.
+
+    A partition is only treated as "something else lives here now" when that something is
+    recognised.  A partition with a broken boot sector must not land here: it is usually the
+    damaged filesystem the user wants back, not new data on top of it.
+    """
+    head = src.read(start, 4608)
+    if len(head) < 4608:
+        return None
+    if head[1080:1082] == b"\x53\xef":
+        return "ext2/3/4"
+    if head[:4] == b"XFSB":
+        return "XFS"
+    if head[1024:1026] in (b"H+", b"HX"):
+        return "HFS+"
+    if head[32:36] == b"NXSB":
+        return "APFS"
+    if head[:6] == b"LUKS\xba\xbe":
+        return "LUKS"
+    if head[4086:4096] in (b"SWAPSPACE2", b"SWAP-SPACE"):
+        return "Linux swap"
+    if head[510:512] == b"\x55\xaa" and head[0x36:0x3B] in (b"FAT12", b"FAT16"):
+        return "FAT12/16"
+    if src.read(start + 0x10040, 8) == b"_BHRfS_M":
+        return "btrfs"
+    if src.read(start + 0x8001, 5) == b"CD001":
+        return "ISO 9660"
+    return None

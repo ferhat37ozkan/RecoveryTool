@@ -23,6 +23,9 @@ def main(argv=None):
     ap.add_argument("--disk", type=int, help="physical disk number to recover from")
     ap.add_argument("--image", help="disk image file to recover from")
     ap.add_argument("--dest", help="destination folder (must be on a different disk)")
+    ap.add_argument("--partition", type=int, help="with --disk: recover only this partition number (faster)")
+    ap.add_argument("--offset", type=int, help="recover only a region: start in bytes")
+    ap.add_argument("--length", type=int, help="recover only a region: size in bytes")
     ap.add_argument("--no-lock", action="store_true", help="do not write-protect the disk")
     ap.add_argument("--no-deleted", action="store_true", help="skip deleted files")
     ap.add_argument("--include-live", action="store_true", help="also copy files that are still accessible")
@@ -53,9 +56,18 @@ def main(argv=None):
         for d in disks.list_disks():
             vols = ", ".join("%s%s %s" % ((p["letter"] + ": ") if p["letter"] else "", p["filesystem"] or "RAW",
                                           human_size(p["size"])) for p in d["partitions"]) or "-"
-            print("Disk %d  %-28s %-6s %10s  %-4s  %s%s" % (
-                d["number"], d["name"][:28], d["bus"], human_size(d["size"]), d["style"], vols,
-                "  [system]" if d["system"] else ""))
+            print("Disk %d  %-28s %-6s %10s  %-4s%s%s%s" % (
+                d["number"], d["name"][:28], d["bus"], human_size(d["size"]), d["style"],
+                "  [system]" if d["system"] else "", "  [offline]" if d["offline"] else "",
+                "  [read-only]" if d["readonly"] else ""))
+            for row in disks.layout(d):
+                if row["kind"] == "gap":
+                    print("    %-14s %10s  offset %d" % ("unallocated", human_size(row["size"]), row["offset"]))
+                else:
+                    p = row["part"]
+                    print("    partition %-4d %10s  %-6s %-3s %s" % (
+                        p["number"], human_size(p["size"]), p["filesystem"] or "RAW",
+                        (p["letter"] + ":") if p["letter"] else "", p.get("label") or ""))
         return 0
     if (args.disk is None) == (args.image is None) or not args.dest:
         ap.error("give --dest and exactly one of --disk / --image")
@@ -70,6 +82,17 @@ def main(argv=None):
         source = match[0]
     else:
         source = {"image": args.image}
+    if args.partition is not None:
+        match = [p for p in source.get("partitions", ()) if p["number"] == args.partition]
+        if not match:
+            ap.error("--partition needs --disk and an existing partition number (see --list)")
+        p = match[0]
+        source["region"] = {"offset": p["offset"], "size": p["size"], "filesystem": p.get("filesystem") or "",
+                            "label": "partition %d" % p["number"]}
+    elif args.offset is not None or args.length is not None:
+        if args.offset is None or not args.length:
+            ap.error("--offset and --length go together")
+        source["region"] = {"offset": args.offset, "size": args.length, "filesystem": "", "label": "region"}
 
     state = {"t": 0.0}
 

@@ -1,0 +1,54 @@
+[
+  {
+    "number": 0, "name": "Samsung SSD 990 PRO 1TB", "serial": "S6Z1NJ0W000001", "bus": "NVMe",
+    "size": 1000184799232, "sector": 512, "style": "GPT", "readonly": false, "offline": false, "system": true,
+    "health": "Healthy", "status": "Online",
+    "partitions": [
+      {"number": 1, "letter": "", "size": 104857600, "offset": 1048576, "type": "System", "hidden": true,
+       "filesystem": "FAT32", "label": "", "health": "Healthy", "free": 73400320},
+      {"number": 2, "letter": "", "size": 16777216, "offset": 105906176, "type": "Reserved", "hidden": true,
+       "filesystem": "", "label": "", "health": "", "free": 0},
+      {"number": 3, "letter": "C", "size": 999116300288, "offset": 122683392, "type": "Basic", "hidden": false,
+       "filesystem": "NTFS", "label": "Windows", "health": "Healthy", "free": 442381631488},
+      {"number": 4, "letter": "", "size": 943718400, "offset": 999240032256, "type": "Recovery", "hidden": true,
+       "filesystem": "NTFS", "label": "", "health": "Healthy", "free": 157286400}
+    ]
+  },
+  {
+    "number": 1, "name": "WD Elements 2TB", "serial": "WX42D81A0002", "bus": "USB",
+    "size": 2000365289472, "sector": 512, "style": "GPT", "readonly": false, "offline": false, "system": false,
+    "health": "Healthy", "status": "Online",
+    "partitions": [
+      {"number": 1, "letter": "", "size": 16777216, "offset": 1048576, "type": "Reserved", "hidden": true,
+       "filesystem": "", "label": "", "health": "", "free": 0},
+      {"number": 2, "letter": "", "size": 858993459200, "offset": 17825792, "type": "Basic", "hidden": false,
+       "filesystem": "", "label": "", "health": "", "free": 0},
+      {"number": 3, "letter": "E", "size": 644245094400, "offset": 859011284992, "type": "Basic", "hidden": false,
+       "filesystem": "NTFS", "label": "Backup", "health": "Healthy", "free": 281320357888}
+    ]
+  },
+  {
+    "number": 2, "name": "Kingston DataTraveler 3.0", "serial": "E0D55EA5740003", "bus": "USB",
+    "size": 30943995904, "sector": 512, "style": "MBR", "readonly": false, "offline": false, "system": false,
+    "health": "Healthy", "status": "Online",
+    "partitions": [
+      {"number": 1, "letter": "", "size": 30942947328, "offset": 1048576, "type": "IFS", "hidden": false,
+       "filesystem": "exFAT", "label": "PHOTOS", "health": "Healthy", "free": 11811160064}
+    ]
+  },
+  {
+    "number": 3, "name": "SanDisk Ultra", "serial": "4C530001200004", "bus": "USB",
+    "size": 62008590336, "sector": 512, "style": "MBR", "readonly": true, "offline": false, "system": false,
+    "health": "Healthy", "status": "Online",
+    "partitions": [
+      {"number": 1, "letter": "F", "size": 62007541760, "offset": 1048576, "type": "FAT32 XINT13", "hidden": false,
+       "filesystem": "FAT32", "label": "SANDISK", "health": "Healthy", "free": 20401094656}
+    ]
+  },
+  {
+    "number": 4, "name": "Generic Flash Disk", "serial": "", "bus": "USB",
+    "size": 0, "sector": 512, "style": "RAW", "readonly": false, "offline": true, "system": false,
+    "health": "Healthy", "status": "No Media",
+    "partitions": []
+  }
+]
