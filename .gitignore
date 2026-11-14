@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+# never commit disk images or recovered data
+*.img
+*.dd
+*.raw
+*.vhd
+*.vhdx
