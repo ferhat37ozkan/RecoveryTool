@@ -13,6 +13,17 @@ By [IdlePose.com](https://idlepose.com). Free, open-source data recovery for Win
   including disks that have no drive letter, are offline, or show up as RAW.
 - Recovers from a **whole disk, a single partition, or a stretch of unallocated space**. Picking
   just the partition you lost is much faster than scanning the whole disk.
+- **Scans first, then lets you choose.** The scan writes nothing and lists everything it found as
+  a folder tree with tick boxes. You recover what you tick, as often as you like.
+- **Does not need room for everything at once.** If the destination fills up, whatever fitted is
+  kept and the rest stays ticked. Move the recovered files away, or pick another folder, and carry
+  on. Recovered files show a **green check mark**, files not recovered yet a **grey ring**.
+- **Every scan is saved.** Close the program and come back next week: "Saved scans" opens the list
+  again, with the state of every file, without scanning the disk a second time.
+- **Pause and continue** at any moment. A scan that is stopped half-way continues from where it
+  was, even after the program was closed.
+- **Live panel** next to the main window: progress, speed with a graph, time left, what the scan
+  has found so far, per-status counts, free space in the destination, the last files written.
 - **Write-protects the source disk** for the duration of the recovery and removes the protection
   again when it finishes, is cancelled, or fails. The source is only ever opened for reading.
 - Rebuilds the folder tree of **FAT32, exFAT and NTFS** volumes from what is still on the disk:
@@ -43,8 +54,18 @@ By [IdlePose.com](https://idlepose.com). Free, open-source data recovery for Win
    rights; reading raw disks requires them).
 2. Select the disk you lost data on, or open it and select just the partition or the unallocated
    space where the data was.
-3. Select a destination folder **on a different disk**.
-4. Press **Start recovery**.
+3. Press **Start scan**. Nothing is written anywhere yet. **Pause** and **Stop** are next to it; a
+   stopped scan can be continued later.
+4. When the scan is done the files are listed. Tick the folders and files you want (everything is
+   ticked to begin with), choose a destination folder **on a different disk**, and press
+   **Recover ticked files**.
+5. Not enough room? Recover anyway: what fits is written and marked green, the rest stays ticked.
+   Move the recovered files elsewhere or choose another folder and press the button again. You
+   can also close the program and continue another day from **Saved scans**.
+
+The total a scan reports can be larger than the disk itself: deleted files whose space was reused
+and old copies of the same file each count in full. That is why you choose, instead of having to
+find that much free space.
 
 Stop using the disk you lost data on as soon as you notice the loss. Every write to it can
 destroy something that was still recoverable. Do not let Windows "initialise" or "format" it.
@@ -75,6 +96,9 @@ Windows recognises its filesystem, so a lost or RAW partition is always recovere
       needs-attention.txt   everything that is not OK
       summary.txt
 ```
+
+Every recovery run writes its own report folder. A file that was ticked but did not fit is listed
+as `NOT_RECOVERED` and is still waiting in the saved scan.
 
 | Status | Meaning |
 |---|---|
@@ -149,10 +173,15 @@ Be clear about these before relying on it:
    the extent of an ISO image written to the start of the disk, and partitions holding something
    the tool cannot read. Any old file overlapping these is damaged, or possibly damaged, in
    exactly those bytes.
-5. **Extract** to the destination, hashing as it goes; restore timestamps and attributes.
-6. **Verify**: read every written file back, test ZIP-based documents (docx/xlsx/…) by CRC,
-   compare content against the file type's signature, repair from twins.
-7. **Report**, then **unlock** the disk.
+5. **Save the catalogue** of everything found as a scan file and **unlock** the disk. Nothing has
+   been written to the destination so far.
+6. For the files the user ticks, with the disk locked again: **extract** each one to the
+   destination, hashing as it goes, restore timestamps and attributes, then **verify** it at
+   once: read it back, test ZIP-based documents (docx/xlsx/…) by CRC, compare the content against
+   the file type's signature. Its outcome is recorded in the scan file before the next file
+   starts. A file that does not fit into the free space is skipped and stays pending.
+7. **Repair from twins**, write the **report** of this run, **unlock** the disk. Step 6 and 7
+   can be repeated for other files or another destination at any time.
 
 ## Run from source
 
@@ -178,9 +207,11 @@ py -3.12 -m venv .venv
 | `scanner.py` | Single-pass metadata scan |
 | `fat32.py`, `exfat.py`, `ntfs.py` | Filesystem reconstruction |
 | `allocation.py` | Current partition table and what currently occupies the disk (overwrite detection) |
-| `engine.py` | Pipeline: plan, extract, verify, repair, report |
+| `engine.py` | Pipeline: scan and catalogue; then extract, verify, repair, report for the chosen files |
+| `session.py` | Saved scans (SQLite): the catalogue and what has been recovered; checkpoints of interrupted scans |
+| `catalog.py` | The catalogue as a folder tree with tick boxes and per-folder counters (model of the result browser) |
 | `signatures.py` | File-type signatures |
-| `gui.py`, `cli.py`, `i18n.py` | Interfaces and translations |
+| `gui.py`, `icons.py`, `cli.py`, `i18n.py` | Interfaces, row icons and translations |
 
 ## Tests
 
@@ -189,11 +220,11 @@ py -3.12 -m venv .venv
 | `tests\test_source.py` | nothing | reading from a failing disk: bad sectors, unplugged device |
 | `tests\test_troubleshoot.py` | nothing | disk layout, troubleshooter findings, translations; uses a made-up disk list |
 | `tests\test_layouts.py` | nothing; more with a disk image | MBR/GPT parsing, lost partitions, single-partition recovery, an image written over a disk |
+| `tests\test_session.py` | nothing; more with a disk image | pause and stop, continuing an interrupted scan, saved scans, a destination that is too small, recovering in several goes |
 | `tests\test_scenarios.py` | administrator, diskpart | real filesystems in virtual disks, destroyed and recovered, checked against original hashes |
 
 The property the scenario suite enforces: **a file reported `OK` or `REPAIRED` is byte-identical
-to the original.** Results of the last full run (version 1.0.0; the recovery code paths it
-exercises are unchanged in 1.0.1 apart from the fixes listed in the changelog):
+to the original.** Results of the last full run (version 1.0.2):
 
 | Scenario | Recovered | False `OK` |
 |---|---|---|
@@ -219,6 +250,12 @@ from a multi-partition physical disk. They were developed against image files an
 list. Reports from real disks are welcome.
 
 ## If a run is interrupted
+
+Nothing is lost. Files are finished one at a time and recorded in the saved scan as they are
+written, so after a crash the scan opens with everything up to that point marked as recovered.
+A scan that did not finish continues from its last checkpoint (taken every 20 seconds) when the
+same disk is scanned again. Scans live in `%LOCALAPPDATA%\RecoveryTool`, never on the disk
+that is being recovered.
 
 If the computer loses power or crashes mid-recovery, the source disk stays write-protected.
 RecoveryTool remembers this (by disk serial number) and offers to remove the protection the next
@@ -254,6 +291,17 @@ Windows'ta **görünmeyen** disklerdeki dosyaları **özgün adları ve klasör 
   harfi olmayan, çevrimdışı veya RAW görünen diskler dahil.
 - **Diskin tamamından, tek bir bölümden ya da ayrılmamış bir alandan** kurtarır. Yalnızca
   kaybettiğiniz bölümü seçmek, tüm diski taramaktan çok daha hızlıdır.
+- **Önce tarar, sonra seçtirir.** Tarama hiçbir şey yazmaz; bulduğu her şeyi onay kutulu bir
+  klasör ağacı olarak listeler. İşaretlediklerinizi, istediğiniz kadar seferde kurtarırsınız.
+- **Her şeye aynı anda yer gerekmez.** Hedef dolarsa sığanlar kalır, sığmayanlar seçili bekler.
+  Kurtarılanları başka yere taşıyın ya da başka klasör seçin ve devam edin. Kurtarılan dosyalarda
+  **yeşil onay işareti**, henüz kurtarılmayanlarda **gri halka** görünür.
+- **Her tarama kaydedilir.** Programı kapatıp haftaya dönün: "Kayıtlı taramalar" listeyi her
+  dosyanın durumuyla birlikte, diski yeniden taramadan açar.
+- **Duraklat ve devam et**: istediğiniz anda. Yarıda durdurulan tarama, program kapatılmış olsa
+  bile kaldığı yerden sürer.
+- **Canlı panel**: ilerleme, grafikli hız, kalan süre, taramanın o ana dek buldukları, duruma göre
+  dosya sayıları, hedefteki boş alan, son yazılan dosyalar. Bir düğmeyle gizlenir ve açılır.
 - Kurtarma süresince **kaynak diski yazmaya karşı kilitler**; işlem bitince, iptal edilince veya
   hata verince kilidi kendisi kaldırır. Kaynak yalnızca okunur.
 - **FAT32, exFAT ve NTFS** birimlerinin klasör ağacını diskte kalan izlerden yeniden kurar: hızlı
@@ -278,8 +326,18 @@ Windows'ta **görünmeyen** disklerdeki dosyaları **özgün adları ve klasör 
 1. Releases sayfasından `RecoveryTool.exe` dosyasını indirip çalıştırın (yönetici izni ister).
 2. Veri kaybettiğiniz diski seçin; ya da diski açıp yalnızca verinin bulunduğu bölümü veya
    ayrılmamış alanı seçin.
-3. **Başka bir diskte** bir hedef klasör seçin.
-4. **Kurtarmayı başlat**'a basın.
+3. **Taramayı başlat**'a basın. Bu aşamada hiçbir yere bir şey yazılmaz. Yanında **Duraklat** ve
+   **Durdur** vardır; durdurulan tarama sonra kaldığı yerden sürdürülebilir.
+4. Tarama bitince dosyalar listelenir. İstediğiniz klasör ve dosyaları işaretleyin (başlangıçta
+   hepsi işaretlidir), **başka bir diskte** bir hedef klasör seçin ve **Seçilenleri kurtar**'a
+   basın.
+5. Yer yetmiyor mu? Yine de başlatın: sığanlar yazılıp yeşil işaretlenir, kalanlar seçili bekler.
+   Kurtarılanları başka yere taşıyın ya da başka klasör seçip düğmeye yeniden basın. Programı
+   kapatıp başka bir gün **Kayıtlı taramalar**'dan da devam edebilirsiniz.
+
+Taramanın bildirdiği toplam, diskin kendisinden büyük olabilir: yeri yeniden kullanılmış silinmiş
+dosyalar ve aynı dosyanın eski kopyaları ayrı ayrı sayılır. Bu yüzden o kadar boş yer aramak
+yerine neyi kurtaracağınızı siz seçersiniz.
 
 Veri kaybını fark ettiğiniz anda o diski kullanmayı bırakın. Windows "diski başlat" ya da
 "biçimlendir" derse kabul etmeyin.

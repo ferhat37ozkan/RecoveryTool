@@ -133,9 +133,9 @@ To see what the scanner finds in an image without recovering anything:
 4. Tag and upload:
 
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
-gh release create v1.0.1 dist\RecoveryTool.exe --title "v1.0.1" --notes "what changed"
+git tag v1.0.2
+git push origin v1.0.2
+gh release create v1.0.2 dist\RecoveryTool.exe --title "v1.0.2" --notes "what changed"
 ```
 
 `dist\` is in `.gitignore` on purpose. The exe goes into the release, not into the repository.
@@ -275,9 +275,9 @@ Kurtarma yapmadan, tarayıcının bir imajda ne bulduğunu görmek için:
 4. Etiketleyip yükleyin:
 
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
-gh release create v1.0.1 dist\RecoveryTool.exe --title "v1.0.1" --notes "neler değişti"
+git tag v1.0.2
+git push origin v1.0.2
+gh release create v1.0.2 dist\RecoveryTool.exe --title "v1.0.2" --notes "neler değişti"
 ```
 
 `dist\` bilerek `.gitignore` içinde. Exe depoya değil, sürüme (release) eklenir.

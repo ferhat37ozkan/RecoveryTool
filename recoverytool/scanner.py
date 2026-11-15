@@ -12,6 +12,7 @@ after a format, when the partition table and boot sector no longer describe the 
 from __future__ import annotations
 
 import re
+import time
 from array import array
 
 from .model import Cancelled
@@ -34,6 +35,8 @@ class ScanResult:
         self.mft = array("Q")
         self.exfat_sets = array("Q")
         self.nonzero_bytes = 0
+        self.pos = 0                # everything before this offset has been scanned
+        self.bad_bytes = 0          # unreadable bytes met so far (kept across a resumed scan)
 
 
 def _aligned(buf, pat, align, rel=0):
@@ -44,11 +47,17 @@ def _aligned(buf, pat, align, rel=0):
         i = buf.find(pat, i + 1)
 
 
-def scan(src, progress=None, cancel=None):
-    res = ScanResult()
-    off, size = 0, src.size
+def scan(src, progress=None, cancel=None, state=None, checkpoint=None, every=20.0):
+    """``state`` is the ScanResult of an interrupted scan to continue from.  ``checkpoint(res)``
+    is called every ``every`` seconds and when the scan is stopped, so it can be continued later."""
+    res = state or ScanResult()
+    off, size = min(res.pos, src.size), src.size
+    saved = time.time()
     while off < size:
         if cancel is not None and cancel.is_set():
+            if checkpoint:
+                res.bad_bytes = src.bad_bytes
+                checkpoint(res)
             raise Cancelled()
         buf = src.read_raw(off, min(CHUNK, size - off))
         if not buf:
@@ -73,6 +82,15 @@ def scan(src, progress=None, cancel=None):
             for i in sorted(found):
                 res.exfat_sets.append(off + i)
         off += len(buf)
+        res.pos = off
+        if checkpoint and time.time() - saved >= every:
+            res.bad_bytes = src.bad_bytes
+            checkpoint(res)
+            saved = time.time()
         if progress:
             progress(off, size)
+    res.pos = size
+    if checkpoint:                              # stopped during the analysis: nothing to scan again
+        res.bad_bytes = src.bad_bytes
+        checkpoint(res)
     return res

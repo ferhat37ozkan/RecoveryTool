@@ -11,7 +11,7 @@ STRINGS = {
     "subtitle": ("Recover files from formatted, deleted or invisible disks - names and folder structure preserved",
                  "Biçimlendirilmiş, silinmiş veya görünmeyen disklerden dosya kurtarma - adlar ve klasör yapısı korunur"),
     "step1": ("1  Select the disk to recover from", "1  Kurtarılacak diski seçin"),
-    "step2": ("2  Select the folder to recover into", "2  Kurtarılan dosyaların yazılacağı klasörü seçin"),
+    "step2": ("2  Folder and options (the folder can also be chosen after the scan)", "2  Klasör ve seçenekler (klasör taramadan sonra da seçilebilir)"),
     "step3": ("3  Options", "3  Seçenekler"),
     "refresh": ("Refresh", "Yenile"),
     "open_image": ("Open image file…", "İmaj dosyası aç…"),
@@ -293,6 +293,195 @@ STRINGS.update({
                          "files are probably still in this space. Search just this space.",
                          "Burada daha önce bir bölüm vardıysa ve kaybolduysa (silindi ya da tablo ezildi), dosyaları "
                          "büyük olasılıkla hâlâ bu alandadır. Yalnızca bu alanı tarayın."),
+})
+
+
+STRINGS.update({
+    # --- scan first, recover what you choose ---
+    "ph_save": ("Saving the scan", "Tarama kaydediliyor"),
+    "log_hopeless": ("{n} entries have no readable data left and are not counted.",
+                     "{n} kaydın okunabilir verisi kalmamış; hesaba katılmadı."),
+    "log_oversize": ("Note: the files found add up to {total}, more than the source itself ({src}). On the disk "
+                     "they occupy {unique}; {shared} of disk space is claimed by more than one entry (a deleted "
+                     "file whose space was reused, older copies of the same file). Deleted entries alone are "
+                     "{deleted}. You do not need that much room: untick what you do not want.",
+                     "Not: bulunan dosyaların toplamı {total}; bu, kaynağın kendisinden ({src}) büyük. Diskte "
+                     "kapladıkları alan {unique}; {shared} kadar disk alanını birden çok kayıt sahipleniyor "
+                     "(yeri yeniden kullanılmış silinmiş dosya, aynı dosyanın eski kopyaları). Yalnızca silinmiş "
+                     "kayıtlar {deleted}. Bu kadar boş yere ihtiyacınız yok: istemediklerinizin işaretini kaldırın."),
+    "log_no_space": ("{n} files ({size}) did not fit into the destination. They are still waiting: free some "
+                     "space or choose another folder, then recover again.",
+                     "{n} dosya ({size}) hedefe sığmadı. Bekliyorlar: yer açın ya da başka bir klasör seçin, "
+                     "sonra yeniden kurtarın."),
+    "log_resume_scan": ("Continuing the interrupted scan from {pos}.", "Yarıda kalan tarama {pos} noktasından sürdürülüyor."),
+    "log_not_saved": ("The scan could not be saved ({err}); it is kept until the program is closed.",
+                      "Tarama kaydedilemedi ({err}); program kapanana kadar bellekte tutulacak."),
+    "sum_no_space": ("Waiting: no room in the destination", "Bekleyen: hedefte yer kalmadı"),
+    "sum_pending": ("Not recovered yet (whole scan)", "Henüz kurtarılmayan (tüm tarama)"),
+    "sum_stopped": ("Stopped by the user before the end.", "Bitmeden kullanıcı tarafından durduruldu."),
+    "ph_list": ("Listing the files", "Dosyalar listeleniyor"),
+    "start_scan": ("Start scan", "Taramayı başlat"),
+    "recover_selected": ("Recover ticked files", "Seçilenleri kurtar"),
+    "pause": ("Pause", "Duraklat"),
+    "resume": ("Continue", "Devam et"),
+    "stop": ("Stop", "Durdur"),
+    "stopping": ("Stopping…", "Durduruluyor…"),
+    "new_scan": ("New scan", "Yeni tarama"),
+    "scans": ("Saved scans", "Kayıtlı taramalar"),
+    "panel_show": ("Live panel  ▸", "Canlı panel  ▸"),
+    "panel_hide": ("Live panel  ◂", "Canlı panel  ◂"),
+    "paused": ("Paused. Nothing is read or written until you continue.",
+               "Duraklatıldı. Devam edene kadar hiçbir şey okunmaz ve yazılmaz."),
+    "resumed": ("Continuing.", "Devam ediliyor."),
+    "err_dest_for_image": ("Creating a disk image first needs a folder: choose one before starting.",
+                           "Önce disk imajı almak için bir klasör gerekir: başlamadan önce bir klasör seçin."),
+    "ask_resume": ("A scan of this source was stopped at {pct:.0f}% ({when}).\n\nContinue from there?\n\n"
+                   "Yes: continue    No: scan again from the start",
+                   "Bu kaynağın taraması %{pct:.0f} noktasında durdurulmuş ({when}).\n\nKaldığı yerden devam "
+                   "edilsin mi?\n\nEvet: devam et    Hayır: baştan tara"),
+    "scan_stopped": ("Scan stopped", "Tarama durduruldu"),
+    "scan_stopped_note": ("The scan was stopped. Its position is saved: start a scan of the same disk again to "
+                          "continue from there.",
+                          "Tarama durduruldu. Kaldığı yer kaydedildi: aynı diski yeniden taramaya başlayınca "
+                          "oradan devam edebilirsiniz."),
+    "done_scan": ("Scan finished", "Tarama tamamlandı"),
+    "scan_opened": ("Saved scan opened", "Kayıtlı tarama açıldı"),
+    "loading_scan": ("Opening the saved scan…", "Kayıtlı tarama açılıyor…"),
+    "err_scan_file": ("This scan file cannot be opened: {err}", "Bu tarama dosyası açılamıyor: {err}"),
+    "scan_result": ("{n} recoverable files found ({size}).", "Kurtarılabilir {n} dosya bulundu ({size})."),
+    "scan_progress": ("Already recovered: {done} files ({size}). Still waiting: {left}.",
+                      "Daha önce kurtarılan: {done} dosya ({size}). Bekleyen: {left}."),
+    "scan_saved": ("The scan is saved; you can close the program and come back to it under 'Saved scans'.",
+                   "Tarama kaydedildi; programı kapatıp 'Kayıtlı taramalar'dan geri dönebilirsiniz."),
+    "scan_unsaved": ("This scan could not be saved to a safe place and is lost when the program is closed.",
+                     "Bu tarama güvenli bir yere kaydedilemedi; program kapanınca kaybolur."),
+    "scan_next": ("Tick what you want, choose a folder and press 'Recover ticked files'. It does not have to "
+                  "fit all at once.",
+                  "İstediklerinizi işaretleyin, bir klasör seçin ve 'Seçilenleri kurtar'a basın. Hepsinin bir "
+                  "seferde sığması gerekmez."),
+    "ask_drop_scan": ("This scan is not saved. If you leave it, the disk has to be scanned again. Leave?",
+                      "Bu tarama kayıtlı değil. Çıkarsanız diskin yeniden taranması gerekir. Çıkılsın mı?"),
+    # --- result browser ---
+    "found_title": ("Files found - tick what to recover", "Bulunan dosyalar - kurtarılacakları işaretleyin"),
+    "find_label": ("Search name:", "Adda ara:"),
+    "find_none": ("No file name contains this.", "Bu metni içeren dosya adı yok."),
+    "select_all": ("Tick all not recovered", "Kurtarılmayanları seç"),
+    "select_none": ("Untick all", "Seçimi kaldır"),
+    "legend": ("green ✓ recovered    grey ○ not yet", "yeşil ✓ kurtarıldı    gri ○ henüz değil"),
+    "col_file": ("Name", "Ad"),
+    "col_modified": ("Modified", "Değiştirilme"),
+    "recover_into": ("Recover into:", "Kurtarılacak klasör:"),
+    "more_rows": ("… {n} more here; use the search box to reach them",
+                  "… burada {n} tane daha var; ulaşmak için arama kutusunu kullanın"),
+    "fs_folder": ("{done} / {files} recovered", "{done} / {files} kurtarıldı"),
+    "fs_pending": ("Not recovered yet", "Henüz kurtarılmadı"),
+    "fs_ok": ("Recovered", "Kurtarıldı"),
+    "fs_warn": ("Recovered, unproven", "Kurtarıldı, kanıtlanamıyor"),
+    "fs_bad": ("Recovered, damaged", "Kurtarıldı, hasarlı"),
+    "fs_fail": ("Cannot be recovered", "Kurtarılamaz"),
+    "m_tick": ("Tick", "İşaretle"),
+    "m_untick": ("Untick", "İşareti kaldır"),
+    "m_open_file": ("Open the recovered file", "Kurtarılan dosyayı aç"),
+    "m_show_file": ("Show in folder", "Klasörde göster"),
+    "m_details": ("Details…", "Ayrıntılar…"),
+    "sel_info": ("Ticked: {n} files, {size}      Scan: {total} files, {done} recovered, {left} waiting",
+                 "Seçili: {n} dosya, {size}      Tarama: {total} dosya, {done} kurtarıldı, {left} bekliyor"),
+    "fit_no_dest": ("Choose the folder to recover into (on a different disk).",
+                    "Kurtarılacak klasörü seçin (başka bir diskte)."),
+    "fit_ok": ("Free there: {free} - everything ticked fits.", "Orada boş: {free} - seçilenlerin hepsi sığıyor."),
+    "fit_partial": ("Free there: {free}, ticked: {size}. That is fine: as much as fits is recovered, the rest stays "
+                    "grey and can be recovered later.",
+                    "Orada boş: {free}, seçili: {size}. Sorun değil: sığdığı kadarı kurtarılır, kalanı gri kalır ve "
+                    "sonra kurtarılabilir."),
+    "err_nothing_ticked": ("Nothing is ticked. Tick the files or folders to recover first.",
+                           "Hiçbir şey işaretli değil. Önce kurtarılacak dosya ya da klasörleri işaretleyin."),
+    "space_title": ("Not everything fits", "Hepsi sığmıyor"),
+    "space_body": ("Ticked: {need}. Free in the destination: {free}.\n\nRecovery goes on until the space is used "
+                   "up. Finished files are marked green; what did not fit stays ticked. Move the recovered files "
+                   "elsewhere (or choose another folder) and press 'Recover ticked files' again - no new scan is "
+                   "needed.\n\nStart now?",
+                   "Seçili: {need}. Hedefte boş: {free}.\n\nKurtarma yer bitene kadar sürer. Biten dosyalar yeşil "
+                   "işaretlenir; sığmayanlar seçili kalır. Kurtarılanları başka bir yere taşıyın (ya da başka bir "
+                   "klasör seçin) ve yeniden 'Seçilenleri kurtar'a basın - yeniden tarama gerekmez.\n\n"
+                   "Şimdi başlansın mı?"),
+    "space_after": ("{n} files ({size}) did not fit and are still ticked.\n\nMove the recovered files elsewhere or "
+                    "choose another folder, then press 'Recover ticked files' again.",
+                    "{n} dosya ({size}) sığmadı ve seçili duruyor.\n\nKurtarılanları başka bir yere taşıyın ya da "
+                    "başka bir klasör seçin, sonra yeniden 'Seçilenleri kurtar'a basın."),
+    "recover_start": ("Recovering {n} files ({size}) into {dst}", "{n} dosya ({size}) kurtarılıyor: {dst}"),
+    "run_stopped": ("Recovery stopped", "Kurtarma durduruldu"),
+    "run_none": ("No file was recovered in this run.", "Bu çalışmada hiçbir dosya kurtarılamadı."),
+    "result_no_space": ("{n} files ({size}) did not fit into the destination and are still waiting.",
+                        "{n} dosya ({size}) hedefe sığmadı; bekliyor."),
+    "result_pending": ("Not recovered yet in this scan: {n} files ({size}).",
+                       "Bu taramada henüz kurtarılmayan: {n} dosya ({size})."),
+    "result_all_done": ("Everything recoverable in this scan has been recovered.",
+                        "Bu taramadaki kurtarılabilir her şey kurtarıldı."),
+    # --- live panel ---
+    "panel_title": ("Live panel", "Canlı panel"),
+    "ps_idle": ("Idle", "Boşta"),
+    "ps_running": ("Running", "Çalışıyor"),
+    "ps_paused": ("Paused", "Duraklatıldı"),
+    "ps_done": ("Finished", "Tamamlandı"),
+    "ps_stopped": ("Stopped", "Durduruldu"),
+    "pg_progress": ("Progress", "İlerleme"),
+    "pg_source": ("Source", "Kaynak"),
+    "pg_scan": ("Scan findings", "Tarama bulguları"),
+    "pg_recover": ("This recovery run", "Bu kurtarma"),
+    "pg_catalog": ("Whole scan", "Taramanın tamamı"),
+    "pg_recent": ("Last files", "Son dosyalar"),
+    "pl_elapsed": ("Elapsed", "Geçen süre"),
+    "pl_eta": ("Remaining (estimate)", "Kalan (tahmini)"),
+    "pl_speed": ("Speed now", "Anlık hız"),
+    "pl_avg": ("Average speed", "Ortalama hız"),
+    "pl_data": ("Data processed", "İşlenen veri"),
+    "pl_bad": ("Unreadable on source", "Kaynakta okunamayan"),
+    "pl_mft": ("NTFS file records", "NTFS dosya kaydı"),
+    "pl_fat": ("FAT folders", "FAT klasörü"),
+    "pl_exfat": ("exFAT entries", "exFAT girdisi"),
+    "pl_boot": ("Boot sectors", "Önyükleme sektörü"),
+    "pl_files": ("Files handled", "İşlenen dosya"),
+    "pl_ok": ("Intact", "Sorunsuz"),
+    "pl_repaired": ("Repaired", "Onarılan"),
+    "pl_uncertain": ("Unproven", "Belirsiz"),
+    "pl_damaged": ("Damaged", "Hasarlı"),
+    "pl_failed": ("Failed", "Başarısız"),
+    "pl_waiting": ("Waiting for space", "Yer bekleyen"),
+    "pl_free": ("Free in destination", "Hedefte boş alan"),
+    "pl_total": ("Recoverable", "Kurtarılabilir"),
+    "pl_done": ("Recovered", "Kurtarılan"),
+    "pl_left": ("Not yet", "Bekleyen"),
+    "per_s": ("/s", "/sn"),
+    "pct": ("{pct:.1f}%", "%{pct:.1f}"),
+    "graph_empty": ("speed", "hız"),
+    "graph_peak": ("peak {speed}/s", "en yüksek {speed}/sn"),
+    "vol_line": ("{fs}{label}: {files} files, {dirs} folders", "{fs}{label}: {files} dosya, {dirs} klasör"),
+    "vol_none": ("no filesystem found", "dosya sistemi bulunamadı"),
+    # --- saved scans ---
+    "scans_title": ("Saved scans", "Kayıtlı taramalar"),
+    "scans_hint": ("Every finished scan is kept here with the state of each file. Open one to recover more "
+                   "from it without scanning the disk again; the disk has to be connected.",
+                   "Biten her tarama, her dosyanın durumuyla birlikte burada saklanır. Diski yeniden taramadan "
+                   "kurtarmaya devam etmek için birini açın; diskin bağlı olması gerekir."),
+    "col_when": ("Scanned", "Tarama zamanı"),
+    "col_scan_source": ("Source", "Kaynak"),
+    "col_scan_files": ("Recoverable", "Kurtarılabilir"),
+    "col_scan_done": ("Recovered so far", "Şimdiye dek kurtarılan"),
+    "scans_none": ("No saved scan yet.", "Henüz kayıtlı tarama yok."),
+    "scans_open": ("Open", "Aç"),
+    "scans_delete": ("Delete", "Sil"),
+    "scans_file": ("Open a scan file", "Tarama dosyası aç"),
+    "scans_type": ("RecoveryTool scans", "RecoveryTool taramaları"),
+    "ask_delete_scan": ("Delete this saved scan? Recovered files are not touched; only the list is removed.",
+                        "Bu kayıtlı tarama silinsin mi? Kurtarılan dosyalara dokunulmaz; yalnızca liste silinir."),
+    "cli_resume": ("Some files are still waiting. To recover them later without scanning again:\n"
+                   "    recoverytool --resume \"{path}\" --dest <folder>",
+                   "Bazı dosyalar hâlâ bekliyor. Yeniden taramadan sonra kurtarmak için:\n"
+                   "    recoverytool --resume \"{path}\" --dest <klasör>"),
+    "err_image_missing": ("The image file of this scan is no longer there: {path}",
+                          "Bu taramanın imaj dosyası artık yerinde değil: {path}"),
+    "err_disk_missing": ("The disk of this scan is not connected: {name} ({size}). Plug it in and try again.",
+                         "Bu taramanın diski bağlı değil: {name} ({size}). Takıp yeniden deneyin."),
 })
 
 

@@ -3,6 +3,12 @@
     python -m recoverytool.cli --list
     python -m recoverytool.cli --disk 1 --dest E:\\Recovered
     python -m recoverytool.cli --image usb.img --dest E:\\Recovered
+
+The scan is saved.  If the destination fills up, whatever fitted is kept and the rest can be
+fetched later without scanning again:
+
+    python -m recoverytool.cli --scans
+    python -m recoverytool.cli --resume <scan file> --dest F:\\More
 """
 
 from __future__ import annotations
@@ -12,8 +18,8 @@ import sys
 import threading
 import time
 
-from . import APP_NAME, __version__, disks, i18n
-from .engine import Options, RecoveryError, format_duration, run_recovery
+from . import APP_NAME, __version__, disks, i18n, session
+from .engine import Options, RecoveryError, format_duration, recover_session, scan_source
 from .model import Cancelled, human_size
 
 
@@ -32,6 +38,8 @@ def main(argv=None):
     ap.add_argument("--no-twin-repair", action="store_true", help="do not repair from identical copies")
     ap.add_argument("--no-verify", action="store_true", help="skip read-back verification")
     ap.add_argument("--image-first", action="store_true", help="image the disk first, then work on the image")
+    ap.add_argument("--scans", action="store_true", help="list saved scans and exit")
+    ap.add_argument("--resume", metavar="SCAN", help="recover what is still waiting in a saved scan (needs --dest)")
     ap.add_argument("--unlock-pending", action="store_true",
                     help="release disks left write-protected by an interrupted run and exit")
     ap.add_argument("--lang", choices=["en", "tr"], help="message language")
@@ -69,9 +77,20 @@ def main(argv=None):
                         p["number"], human_size(p["size"]), p["filesystem"] or "RAW",
                         (p["letter"] + ":") if p["letter"] else "", p.get("label") or ""))
         return 0
-    if (args.disk is None) == (args.image is None) or not args.dest:
+    if args.scans:
+        for info in session.list_sessions():
+            print("%s  %s\n    %d files (%s), %d recovered (%s)\n    %s" % (
+                time.strftime("%Y-%m-%d %H:%M", time.localtime(info["created"])), info["label"], info["files"],
+                human_size(info["size"]), info["recovered"], human_size(info["recovered_size"]), info["path"]))
+        return 0
+    if args.resume:
+        if not args.dest or args.disk is not None or args.image:
+            ap.error("--resume takes --dest and no --disk / --image")
+    elif (args.disk is None) == (args.image is None) or not args.dest:
         ap.error("give --dest and exactly one of --disk / --image")
-    if args.disk is not None:
+    if args.resume:
+        source = {}
+    elif args.disk is not None:
         if not disks.is_admin():
             print(i18n.t("admin_needed"), file=sys.stderr)
             return 2
@@ -109,7 +128,15 @@ def main(argv=None):
                    twin_repair=not args.no_twin_repair, lock=not args.no_lock, verify=not args.no_verify,
                    image_first=args.image_first)
     try:
-        s = run_recovery(source, args.dest, opts, emit, threading.Event())
+        if args.resume:
+            try:
+                scan = session.Session.open(args.resume)
+            except ValueError as ex:
+                raise RecoveryError(i18n.t("err_scan_file", err=ex)) from None
+        else:
+            scan = scan_source(source, opts, emit, threading.Event(), args.dest)
+        s = recover_session(scan, None, args.dest, opts, emit, threading.Event())
+        scan.close()
     except Cancelled:
         print(i18n.t("cancelled"))
         return 1
@@ -119,11 +146,14 @@ def main(argv=None):
     print()
     for key, field in (("sum_recovered", "recovered"), ("sum_ok", "ok"), ("sum_repaired", "repaired"),
                        ("sum_uncertain", "uncertain"), ("sum_damaged", "damaged"), ("sum_skipped", "skipped"),
-                       ("sum_live_skipped", "live_skipped")):
+                       ("sum_live_skipped", "live_skipped"), ("sum_no_space", "no_space"),
+                       ("sum_pending", "pending")):
         print("%-48s %d" % (i18n.t(key) + ":", s[field]))
     print("%-48s %s" % (i18n.t("sum_size") + ":", human_size(s["size"])))
     print("%-48s %s" % (i18n.t("sum_time") + ":", format_duration(s["elapsed"])))
     print("%-48s %s" % (i18n.t("sum_report") + ":", s["report"]))
+    if s["pending"] and s["session"]:
+        print("\n" + i18n.t("cli_resume", path=s["session"]))
     return 0
 
 
