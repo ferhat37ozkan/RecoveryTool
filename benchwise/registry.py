@@ -46,10 +46,15 @@ def _recovery(master):
     return RecoveryView(master)
 
 
+def _health(master):
+    from .diskhealth.view import DiskHealthView
+    return DiskHealthView(master)
+
+
 CATEGORIES = [
     Category("disk", "disk", [
         Tool("disk.recovery", "recover", admin=True, view=_recovery),
-        Tool("disk.health", "pulse", admin=True),
+        Tool("disk.health", "pulse", admin=True, view=_health),
         Tool("disk.surface", "grid", admin=True),
         Tool("disk.repair", "wrench", admin=True),
         Tool("disk.image", "copy", admin=True),

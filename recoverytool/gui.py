@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 from collections import deque
 from tkinter import filedialog, messagebox, ttk
 
@@ -35,6 +36,7 @@ LEVEL_COLOR = {"ok": GOOD, "info": ACCENT, "warning": WARN, "error": BAD}
 PANEL_WIDTH = 330
 ROW_LIMIT = 3000            # rows shown per folder; the rest is reached with the search box
 BUSY = ("scan", "recover", "load")
+LOG_FRAME = 24              # customtkinter units the log box adds around its text area (corners, border)
 
 
 def resource(name):
@@ -68,6 +70,7 @@ class RecoveryView(ctk.CTkFrame):
         self.closing = False
         self.asked_locks = set()
         self.rows = {}                  # disk tree item id -> description of what it stands for
+        self.wanted = None              # disk row to select once the disk list is in (asked by another tool)
         self.ts_window = None
         self.scans_window = None
         self.mode = "select"            # select | scan | results | recover | load
@@ -208,7 +211,7 @@ class RecoveryView(ctk.CTkFrame):
         self.tree.bind("<Button-3>", self.on_right_click)
 
         c2 = self.c2 = self.card(page, t("step2"))
-        c2.pack(fill="x", pady=(10, 0))
+        c2.pack(side="bottom", fill="x", pady=(10, 0))    # before the disk list gets its share
         self.space_label = ctk.CTkLabel(c2, text=" ", font=("Segoe UI", 11), text_color=MUTED, anchor="e")
         self.space_label.place(relx=1.0, x=-18, y=12, anchor="ne")
         row = ctk.CTkFrame(c2, fg_color=CARD)
@@ -249,7 +252,6 @@ class RecoveryView(ctk.CTkFrame):
         self.none_btn.pack(side="left", padx=(8, 0))
         ctk.CTkLabel(tools, text=t("legend"), font=("Segoe UI", 11), text_color=MUTED, anchor="e").pack(side="right")
         holder = ctk.CTkFrame(c3, fg_color=CARD)
-        holder.pack(fill="both", expand=True, padx=16, pady=(0, 8))
         self.rtree = ttk.Treeview(holder, columns=("size", "modified", "state"), show="tree headings", height=8,
                                   style="Files.Treeview", selectmode="browse")
         self.rtree.heading("#0", text=t("col_file"), anchor="w")
@@ -269,7 +271,6 @@ class RecoveryView(ctk.CTkFrame):
         self.rtree.bind("<Button-3>", self.on_file_menu)
         self.rtree.bind("<Double-1>", self.on_file_double)
         row = ctk.CTkFrame(c3, fg_color=CARD)
-        row.pack(fill="x", padx=16, pady=(0, 6))
         ctk.CTkLabel(row, text=t("recover_into"), font=("Segoe UI", 12), text_color=TEXT).pack(side="left", padx=(0, 8))
         self.dest_entry2 = ctk.CTkEntry(row, textvariable=self.dest, height=32, fg_color=BG, border_color=BORDER,
                                         text_color=TEXT, placeholder_text=t("dest_placeholder"))
@@ -278,12 +279,20 @@ class RecoveryView(ctk.CTkFrame):
                                          hover_color="#33405c", text_color=TEXT, command=self.pick_dest)
         self.browse_btn2.pack(side="left", padx=(8, 0))
         self.sel_label = ctk.CTkLabel(c3, text=" ", font=("Segoe UI Semibold", 12), text_color=TEXT, anchor="w")
-        self.sel_label.pack(fill="x", padx=18)
         self.fit_label = ctk.CTkLabel(c3, text=" ", font=("Segoe UI", 11), text_color=MUTED, anchor="w", justify="left")
-        self.fit_label.pack(fill="x", padx=18, pady=(0, 10))
+        # the rows under the file list are packed first (from the bottom up), so a short window
+        # shrinks the list (it scrolls) instead of cutting them off
+        self.fit_label.pack(side="bottom", fill="x", padx=18, pady=(0, 10))
+        self.sel_label.pack(side="bottom", fill="x", padx=18)
+        row.pack(side="bottom", fill="x", padx=16, pady=(0, 6))
+        holder.pack(fill="both", expand=True, padx=16, pady=(0, 8))
 
         # run area ----------------------------------------------------------------------------
-        run = self.run_frame = ctk.CTkFrame(root, fg_color=BG)
+        # Packed at the bottom before the pages, so it always gets its height: when the window is
+        # short, the lists above shrink (they scroll) instead of the log being squeezed.
+        bottom = self.bottom = ctk.CTkFrame(root, fg_color=BG)
+        bottom.pack(side="bottom", fill="x")
+        run = self.run_frame = ctk.CTkFrame(bottom, fg_color=BG)
         run.pack(fill="x", pady=(12, 0))
         self.start_btn = ctk.CTkButton(run, text=t("start_scan"), height=42, width=220, font=("Segoe UI Semibold", 14),
                                        fg_color=ACCENT, hover_color=ACCENT_HOVER, command=self.start_scan)
@@ -299,13 +308,13 @@ class RecoveryView(ctk.CTkFrame):
         self.phase_label = ctk.CTkLabel(run, text=t("ready"), font=("Segoe UI Semibold", 13), text_color=TEXT, anchor="e")
         self.phase_label.pack(side="right")
 
-        self.bar = ctk.CTkProgressBar(root, height=10, fg_color=CARD, progress_color=ACCENT, corner_radius=5)
+        self.bar = ctk.CTkProgressBar(bottom, height=10, fg_color=CARD, progress_color=ACCENT, corner_radius=5)
         self.bar.set(0)
         self.bar.pack(fill="x", pady=(10, 2))
-        self.detail_label = ctk.CTkLabel(root, text=" ", font=("Segoe UI", 11), text_color=MUTED, anchor="w")
+        self.detail_label = ctk.CTkLabel(bottom, text=" ", font=("Segoe UI", 11), text_color=MUTED, anchor="w")
         self.detail_label.pack(fill="x")
-        self.log = ctk.CTkTextbox(root, fg_color=CARD, border_width=1, border_color=BORDER, text_color=TEXT,
-                                  font=("Consolas", 11), corner_radius=12, wrap="word", height=56)
+        self.log = ctk.CTkTextbox(bottom, fg_color=CARD, border_width=1, border_color=BORDER, text_color=TEXT,
+                                  font=("Consolas", 11), corner_radius=12, wrap="word")
         self.log.pack(fill="both", expand=False, pady=(8, 0))
         for tag, color in (("good", GOOD), ("warn", WARN), ("bad", BAD), ("head", "#ffffff")):
             self.log.tag_config(tag, foreground=color)
@@ -529,10 +538,22 @@ class RecoveryView(ctk.CTkFrame):
                 os.path.basename(self.image_path), t("image_file"), human_size(os.path.getsize(self.image_path)),
                 "", self.image_path))
             self.rows["image"] = {"kind": "image"}
-        for iid in selected:
+        for iid in ([self.wanted] if self.wanted else []) + list(selected):
             if self.tree.exists(iid):
                 self.tree.selection_set(iid)
+                self.tree.see(iid)
+                if iid == self.wanted:
+                    self.wanted = None
                 break
+
+    def select_disk(self, number):
+        """Select a disk in the list (now, or as soon as the list has been read)."""
+        if self.busy():
+            return
+        self.wanted = "disk%d" % number
+        if self.tree.exists(self.wanted):
+            self.fill_tree()
+            self.on_select()
 
     def selected_row(self):
         sel = self.tree.selection()
@@ -830,17 +851,21 @@ class RecoveryView(ctk.CTkFrame):
         working = mode in ("scan", "recover")
         self.page_select.pack_forget()
         self.page_results.pack_forget()
-        self.log.configure(height=104 if results else 56)
+        self.log.configure(height=self.log_height(5 if results else 3))
+        self.after_idle(lambda: self.log.see("end"))     # the box changed size: keep the last line in view
         if results:
-            self.page_results.pack(fill="both", expand=True, before=self.run_frame)
+            self.page_results.pack(fill="both", expand=True)
+            self.bottom.pack_configure(fill="x", expand=False)
             self.log.pack_configure(expand=False)
         elif busy:                                      # give the room to the progress log while scanning
             self.c2.pack_forget()
-            self.page_select.pack(fill="x", before=self.run_frame)
+            self.page_select.pack(fill="x")
+            self.bottom.pack_configure(fill="both", expand=True)
             self.log.pack_configure(expand=True)
         else:
-            self.c2.pack(fill="x", pady=(10, 0))
-            self.page_select.pack(fill="both", expand=True, before=self.run_frame)
+            self.c2.pack(side="bottom", fill="x", pady=(10, 0), before=self.c1)   # its share first
+            self.page_select.pack(fill="both", expand=True)
+            self.bottom.pack_configure(fill="x", expand=False)
             self.log.pack_configure(expand=False)
         self.start_btn.configure(text=t("recover_selected" if results else "start_scan"),
                                  command=self.start_recover if results else self.start_scan,
@@ -1266,9 +1291,22 @@ class RecoveryView(ctk.CTkFrame):
         self.log.delete("1.0", "end")
         self.log.configure(state="disabled")
 
+    def log_height(self, lines):
+        """Box height (in customtkinter units) that shows exactly ``lines`` whole lines.
+
+        The text area is the box minus the frame around it (LOG_FRAME units) and its own
+        padding; a height that is not a whole number of lines leaves the top line cut in half."""
+        box = self.log._textbox
+        space = tkfont.Font(font=box.cget("font")).metrics("linespace")
+        pad = 2 * (int(box.cget("pady")) + int(box.cget("borderwidth")) + int(box.cget("highlightthickness")))
+        return (lines * space + pad) / self._get_widget_scaling() + LOG_FRAME
+
     def write(self, text, tag=None):
+        """Add a line.  The newline goes before it, so there is no empty last line to scroll to."""
         self.log.configure(state="normal")
-        self.log.insert("end", text + "\n", tag or ())
+        if self.log.get("1.0", "end-1c"):
+            self.log.insert("end", "\n")
+        self.log.insert("end", text, tag or ())
         self.log.see("end")
         self.log.configure(state="disabled")
 

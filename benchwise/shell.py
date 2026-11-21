@@ -22,8 +22,7 @@ from recoverytool.i18n import t
 from . import APP_NAME, DOMAIN, NAME, __version__, art, elevate, strings  # noqa: F401  (strings fills the table)
 from .registry import CATEGORIES, find_tool
 
-BG, CARD, CARD_HOVER, BORDER = "#0f1420", "#182033", "#1d2740", "#263149"
-TEXT, MUTED, ACCENT, GOOD, WARN = "#e8ecf4", "#8b96ad", "#2f7cf6", "#3ecf8e", "#f5b84b"
+from .ui import ACCENT, BG, BORDER, CARD, CARD_HOVER, GOOD, MUTED, TEXT, WARN
 CARD_W, CARD_H = 250, 210            # category cards
 TOOL_W, TOOL_H = 250, 190            # tool cards
 GAP = 16
@@ -259,6 +258,11 @@ class Shell(ctk.CTk):
         if tool.id not in self.views:
             self.views[tool.id] = tool.view(self)
         self.show(("tool", cat, tool))
+
+    def open_tool_id(self, tool_id):
+        cat, tool = find_tool(tool_id)
+        if tool is not None:
+            self.open_tool(cat, tool)
 
     def busy_views(self):
         return [v for v in self.views.values() if getattr(v, "busy", lambda: False)()]

@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+Added
+
+- **Disk Health** (Disk > Disk Health). Every disk with a plain verdict: Healthy, Watch it, At risk or
+  No data, and the reasons in everyday words (what it means, what to do). Tiles for temperature,
+  power-on time, wear, reallocated and pending sectors, uncorrected errors and power cycles; disk
+  details; and the full ATA SMART table with the attributes that matter coloured. Unknown values are
+  shown as "not reported", never as 0. USB enclosures and RAID arrays that hide health data get an
+  explanation instead of a guess. "Recover files from this disk" opens File Recovery with the disk
+  selected. Demo data: `BENCHWISE_FAKE_HEALTH=docs\demo-health.json`; tests: `tests\test_diskhealth.py`.
+
+Fixed
+
+- The log box at the bottom of File Recovery cut its top line in half: its height was not a whole
+  number of lines, and when the window was short it was squeezed below the requested size. It now
+  shows exactly 3 lines (5 on the results page), keeps the last line in view, and a short window
+  shrinks the disk and file lists (they scroll) instead of the log or the options.
+- Benchwise opens in the middle of the screen; the title reads Benchwise@idlepose.com.
+
 ## 1.1.0
 
 The app is now **Benchwise**, a workbench of tools. RecoveryTool lives on as its first tool,
