@@ -1,7 +1,15 @@
-# IdlePose.com - RecoveryTool
+# IdlePose.com - Benchwise
 
-By [IdlePose.com](https://idlepose.com). Free, open-source data recovery for Windows. Gets files back from **formatted**, **deleted** or
-**invisible** disks with their **original names and folder structure**.
+By [IdlePose.com](https://idlepose.com). A free, open-source workbench of tools for your disks, hardware and
+Windows. The window shows categories as big cards (Disk, System & Memory, Battery & Power, Display & Input,
+Network, Windows Repair, Cleanup & Privacy); each holds its tools. Tools that need administrator rights are
+marked with a shield and ask for them only when you open one.
+
+The first tool, **File Recovery** (formerly RecoveryTool), gets files back from **formatted**, **deleted** or
+**invisible** disks with their **original names and folder structure**. The other tools are on the way;
+their cards say "Coming soon".
+
+The rest of this page describes File Recovery.
 
 [Türkçe açıklama aşağıda](#türkçe)
 
@@ -50,8 +58,8 @@ By [IdlePose.com](https://idlepose.com). Free, open-source data recovery for Win
 
 ## Download and use
 
-1. Download `RecoveryTool.exe` from the Releases page and run it (Windows asks for administrator
-   rights; reading raw disks requires them).
+1. Download `Benchwise.exe` from the Releases page and run it. Open **Disk > File Recovery**; it
+   asks to restart Benchwise as administrator, because reading raw disks requires it.
 2. Select the disk you lost data on, or open it and select just the partition or the unallocated
    space where the data was.
 3. Press **Start scan**. Nothing is written anywhere yet. **Pause** and **Stop** are next to it; a
@@ -194,7 +202,7 @@ cd RecoveryTool
 py -3.12 -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt
 .\.venv\Scripts\python run.py        # from an elevated prompt
-.\build.ps1                          # writes dist\RecoveryTool.exe
+.\build.ps1                          # writes dist\Benchwise.exe
 ```
 
 ### Code map
@@ -260,7 +268,7 @@ that is being recovered.
 If the computer loses power or crashes mid-recovery, the source disk stays write-protected.
 RecoveryTool remembers this (by disk serial number) and offers to remove the protection the next
 time it starts with that disk connected. You can also right-click the disk and choose "Remove
-read-only", run `python -m recoverytool.cli --unlock-pending`, or do it by hand in an elevated
+read-only", run `python -m benchwise --unlock-pending`, or do it by hand in an elevated
 PowerShell: `Set-Disk -Number <n> -IsReadOnly $false`.
 
 ## Contributing
@@ -282,8 +290,16 @@ irreplaceable data on a physically damaged disk, consult a professional recovery
 
 # Türkçe
 
-**IdlePose.com - RecoveryTool** — Windows için ücretsiz, açık kaynak veri kurtarma aracı. **Biçimlendirilmiş**, **silinmiş** veya
-Windows'ta **görünmeyen** disklerdeki dosyaları **özgün adları ve klasör yapısıyla** geri getirir.
+**IdlePose.com - Benchwise** — diskleriniz, donanımınız ve Windows için ücretsiz, açık kaynak bir araç
+tezgâhı. Pencere kategorileri büyük kartlar halinde gösterir (Disk, Sistem ve Bellek, Pil ve Güç, Ekran ve
+Giriş, Ağ, Windows Onarımı, Temizlik ve Gizlilik); her kategorinin içinde kendi araçları vardır. Yönetici
+yetkisi isteyen araçlar kalkanla işaretlidir ve yetkiyi yalnızca açıldıklarında sorar.
+
+İlk araç **Dosya Kurtarma** (eski adıyla RecoveryTool), **biçimlendirilmiş**, **silinmiş** veya Windows'ta
+**görünmeyen** disklerdeki dosyaları **özgün adları ve klasör yapısıyla** geri getirir. Diğer araçlar yolda;
+kartlarında "Yakında" yazar.
+
+Bu sayfanın geri kalanı Dosya Kurtarma'yı anlatır.
 
 ## Neler yapar
 
@@ -323,7 +339,8 @@ Windows'ta **görünmeyen** disklerdeki dosyaları **özgün adları ve klasör 
 
 ## Kullanım
 
-1. Releases sayfasından `RecoveryTool.exe` dosyasını indirip çalıştırın (yönetici izni ister).
+1. Releases sayfasından `Benchwise.exe` dosyasını indirip çalıştırın. **Disk > Dosya Kurtarma**'yı
+   açın; ham diskleri okuyabilmek için Benchwise'ı yönetici olarak yeniden başlatmayı önerir.
 2. Veri kaybettiğiniz diski seçin; ya da diski açıp yalnızca verinin bulunduğu bölümü veya
    ayrılmamış alanı seçin.
 3. **Taramayı başlat**'a basın. Bu aşamada hiçbir yere bir şey yazılmaz. Yanında **Duraklat** ve

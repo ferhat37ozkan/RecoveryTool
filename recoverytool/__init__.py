@@ -1,4 +1,4 @@
-"""RecoveryTool - open-source data recovery for formatted, deleted or invisible volumes."""
+"""File Recovery, the first tool of Benchwise: open-source data recovery for formatted, deleted or
+invisible volumes.  The identity (name, version) is the suite's."""
 
-__version__ = "1.0.2"
-APP_NAME = "IdlePose.com - RecoveryTool"
+from benchwise import APP_NAME, __version__  # noqa: F401

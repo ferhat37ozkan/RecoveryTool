@@ -186,21 +186,62 @@ def current_mft_extent(src, g):
     return Intervals(ranges)
 
 
-def find_volumes(src, scan, log=lambda m: None, cancel=None):
+def find_volumes(src, scan, log=lambda m: None, cancel=None, progress=None):
+    """``progress(done, total)``: records read and linked into folders, over all volumes."""
     geos, seen = [], set()
     for g in _from_boot_sectors(src, scan.boot["NTFS"]) or _infer(src, scan):
         if (g.start, g.cs) not in seen:
             seen.add((g.start, g.cs))
             geos.append(g)
+    tick = _Ticker(progress, sum(bisect_left(scan.mft, g.start + g.size) - bisect_left(scan.mft, g.start)
+                                 for g in geos))
     volumes = []
     for g in geos:
-        vol = _build(src, scan, g, cancel)
+        vol = _build(src, scan, g, cancel, tick)
+        tick._tell()
         log("NTFS: start@%d cluster=%d -> %d files, %d dirs" % ((g.start, g.cs) + vol.count()))
         volumes.append(vol)
     return volumes
 
 
-def _build(src, scan, g, cancel):
+class _Ticker:
+    """One progress figure for reading the records of every volume and linking them into folders.
+
+    Each record read is one unit, each kept record costs two more (making its node, finding its
+    folder).  How many records are kept is only known volume by volume, so the remaining volumes
+    are estimated at the ratio seen so far; the total settles as the work goes on.
+    """
+
+    def __init__(self, progress, total):
+        self.progress, self.read_total = progress, total
+        self.read = self.kept = self.read_done = self.linked = 0
+
+    def total(self):
+        ratio = self.kept / self.read_done if self.read_done else 1.0
+        return self.read_total + 2 * (self.kept + int((self.read_total - self.read_done) * ratio))
+
+    def _tell(self):
+        if self.progress:
+            self.progress(self.read + self.linked, max(self.total(), self.read + self.linked))
+
+    def on_read(self):
+        self.read += 1
+        if self.read & 1023 == 0:
+            self._tell()
+
+    def volume_read(self, kept):
+        """All records of one volume have been read; ``kept`` of them will be linked."""
+        self.read_done, self.kept = self.read, self.kept + kept
+        self._tell()
+
+    def on_link(self):
+        self.linked += 1
+        if self.linked & 1023 == 0:
+            self._tell()
+
+
+def _build(src, scan, g, cancel, tick=None):
+    tick = tick or _Ticker(None, 0)
     vol = Volume("NTFS", g.start, g.size, g.cs)
     # Records are "live" only if this volume is what the partition's boot sector describes now.
     boot = src.read(g.start, 512)
@@ -213,6 +254,7 @@ def _build(src, scan, g, cancel):
             from .model import Cancelled
             raise Cancelled()
         r = parse_record(src, scan.mft[i])
+        tick.on_read()
         if r is None:
             continue
         if r.base:
@@ -237,9 +279,11 @@ def _build(src, scan, g, cancel):
                     system_dirs.add(r.number)
                     grew = True
 
+    tick.volume_read(sum(len(recs) for recs in by_number.values()))
     nodes = {}                                          # id(record) -> Node
     for recs in by_number.values():
         for r in recs:
+            tick.on_link()
             if (r.number < 24 and r.number != ROOT_RECORD) or r.parent in system_dirs:
                 continue
             if r.number == ROOT_RECORD:
@@ -259,6 +303,7 @@ def _build(src, scan, g, cancel):
     placeholders = {}
     for recs in by_number.values():
         for r in recs:
+            tick.on_link()
             n = nodes.get(id(r))
             if n is None or n is vol.root:
                 continue

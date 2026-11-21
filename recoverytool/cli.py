@@ -23,8 +23,142 @@ from .engine import Options, RecoveryError, format_duration, recover_session, sc
 from .model import Cancelled, human_size
 
 
+HELP = {
+    "en": r"""
+{app} {ver} - command line
+
+Usage:  Benchwise-cli.exe <options>
+        (from a source checkout: python -m benchwise <options>)
+
+Reading a disk needs an administrator terminal. Listing, saved scans, image files and this
+help work in any terminal.
+
+INFORMATION (prints and exits)
+  --list                 All disks: number, model, bus, size, MBR/GPT, partitions, drive
+                         letters and unallocated space. Disk and partition numbers come from here.
+  --scans                Saved scans: date, source, files found and recovered, scan file path.
+  --unlock-pending       Release disks left write-protected by an interrupted run. (admin)
+  help, -h, --help, /?   This help.
+
+SOURCE (exactly one)
+  --disk N               Recover from physical disk N (see --list). (admin)
+  --image FILE           Recover from a disk image file (.img, .vhd, ...).
+  --resume SCAN          Recover what is still waiting in a saved scan, without scanning
+                         again (see --scans). Takes --dest, no --disk / --image.
+
+DESTINATION
+  --dest FOLDER          Where recovered files go. Required. Must be on another disk.
+
+NARROW THE SCAN
+  --partition N          With --disk: only this partition. Much faster than the whole disk.
+  --offset X --length Y  Only this region, in bytes (for example a lost partition or the
+                         unallocated space --list shows). Always together.
+
+BEHAVIOUR
+  --no-deleted           Skip deleted files; take only lost and orphaned ones.
+  --include-live         Also copy files Windows can still open normally (skipped by default).
+  --no-twin-repair       Do not repair a damaged file from an identical copy elsewhere.
+  --no-verify            Skip reading each written file back. Faster, not recommended.
+  --no-lock              Do not write-protect the source disk while working. Not recommended.
+  --image-first          Image the whole disk first, then work on the image. Safest for a
+                         dying disk; needs free space the size of the disk at the destination.
+
+OTHER
+  --lang en|tr           Message language (default: the Windows language).
+  --debug                Also print technical detail (where each volume starts, and so on).
+
+NOTE
+  Unlike the desktop app, the command line does not stop after the scan: it recovers everything
+  it finds. If the destination fills up, what fitted is kept; get the rest later with --resume.
+
+EXAMPLES
+  Benchwise-cli.exe --list
+  Benchwise-cli.exe --disk 2 --partition 1 --dest E:\Recovered
+  Benchwise-cli.exe --disk 2 --partition 1 --dest E:\Recovered --debug > scan.log
+  Benchwise-cli.exe --image stick.img --dest E:\Recovered
+  Benchwise-cli.exe --scans
+  Benchwise-cli.exe --resume "C:\...\scan.rtscan" --dest F:\More
+""",
+    "tr": r"""
+{app} {ver} - komut satırı
+
+Kullanım:  Benchwise-cli.exe <seçenekler>
+           (kaynak koddan: python -m benchwise <seçenekler>)
+
+Disk okumak için terminal yönetici olarak açılmalı. Listeleme, kayıtlı taramalar, imaj
+dosyaları ve bu yardım her terminalde çalışır.
+
+BİLGİ (yazar ve çıkar)
+  --list                 Tüm diskler: numara, model, bağlantı, boyut, MBR/GPT, bölümler,
+                         sürücü harfleri ve ayrılmamış alan. Disk/bölüm numaraları buradan.
+  --scans                Kayıtlı taramalar: tarih, kaynak, bulunan/kurtarılan, dosya yolu.
+  --unlock-pending       Yarıda kalan bir işlemden yazma korumalı kalan diskleri serbest bırakır.
+                         (yönetici)
+  help, -h, --help, /?   Bu yardım.
+
+KAYNAK (yalnızca biri)
+  --disk N               N numaralı fiziksel diskten kurtarır (--list'e bakın). (yönetici)
+  --image DOSYA          Bir disk imajı dosyasından kurtarır (.img, .vhd, ...).
+  --resume TARAMA        Kayıtlı bir taramada bekleyenleri yeniden taramadan kurtarır
+                         (--scans'e bakın). --dest ister, --disk / --image ile kullanılmaz.
+
+HEDEF
+  --dest KLASÖR          Kurtarılan dosyaların yazılacağı yer. Zorunlu. Başka bir diskte olmalı.
+
+TARAMAYI DARALTMA
+  --partition N          --disk ile: sadece bu bölüm. Bütün diskten çok daha hızlı.
+  --offset X --length Y  Sadece bu alan, bayt cinsinden (örneğin kayıp bir bölüm ya da
+                         --list'in gösterdiği ayrılmamış alan). İkisi birlikte verilir.
+
+DAVRANIŞ
+  --no-deleted           Silinmiş dosyaları atlar; sadece kayıp ve sahipsiz olanları alır.
+  --include-live         Windows'un hâlâ açabildiği dosyaları da kopyalar (varsayılan: atlanır).
+  --no-twin-repair       Hasarlı dosyayı başka yerdeki aynı kopyasından onarmaz.
+  --no-verify            Yazılan dosyayı geri okuyup doğrulamaz. Daha hızlı, önerilmez.
+  --no-lock              Çalışırken kaynak diski yazmaya karşı kilitlemez. Önerilmez.
+  --image-first          Önce diskin tam imajını çıkarır, sonra imaj üzerinde çalışır. Ölmek
+                         üzere olan disk için en güvenlisi; hedefte disk boyutu kadar yer ister.
+
+DİĞER
+  --lang en|tr           Mesaj dili (varsayılan: Windows dili).
+  --debug                Teknik ayrıntıları da yazar (her bölümün nerede başladığı vb.).
+
+NOT
+  Masaüstü uygulamasından farklı olarak komut satırı taramadan sonra durmaz, bulduğu her şeyi
+  kurtarır. Hedef dolarsa sığanlar kalır; gerisini sonra --resume ile alırsınız.
+
+ÖRNEKLER
+  Benchwise-cli.exe --list
+  Benchwise-cli.exe --disk 2 --partition 1 --dest E:\Kurtarilan
+  Benchwise-cli.exe --disk 2 --partition 1 --dest E:\Kurtarilan --debug > tarama.log
+  Benchwise-cli.exe --image usb.img --dest E:\Kurtarilan
+  Benchwise-cli.exe --scans
+  Benchwise-cli.exe --resume "C:\...\tarama.rtscan" --dest F:\Devami
+""",
+}
+
+
+def print_help():
+    print(HELP[i18n.language()].replace("{app}", APP_NAME).replace("{ver}", __version__).strip("\n"))
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="recoverytool", description="%s %s" % (APP_NAME, __version__))
+    argv = sys.argv[1:] if argv is None else list(argv)
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if "--lang" in argv[:-1]:
+        i18n.set_language(argv[argv.index("--lang") + 1])
+    else:
+        i18n.detect()
+    rest = [a for a in argv if a not in ("--lang", "en", "tr")]
+    if not rest or any(a in ("help", "-h", "--help", "/?", "-?", "/h") for a in argv):
+        print_help()
+        return 0
+    ap = argparse.ArgumentParser(prog="Benchwise-cli", description="%s %s" % (APP_NAME, __version__),
+                                 add_help=False, epilog="help: Benchwise-cli.exe --help")
     ap.add_argument("--list", action="store_true", help="list all disks and exit")
     ap.add_argument("--disk", type=int, help="physical disk number to recover from")
     ap.add_argument("--image", help="disk image file to recover from")
@@ -45,14 +179,12 @@ def main(argv=None):
     ap.add_argument("--lang", choices=["en", "tr"], help="message language")
     ap.add_argument("--debug", action="store_true")
     args = ap.parse_args(argv)
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
     i18n.set_language(args.lang) if args.lang else i18n.detect()
 
     if args.unlock_pending:
+        if not disks.is_admin():
+            print(i18n.t("admin_needed"), file=sys.stderr)
+            return 2
         for d in disks.resolve_pending(disks.list_disks()):
             ok, err = disks.unlock_disk(d["number"], d.get("serial"))
             print(i18n.t("log_unlocked", n=d["number"]) if ok else i18n.t("log_unlock_failed", n=d["number"], err=err))
@@ -133,6 +265,10 @@ def main(argv=None):
                 scan = session.Session.open(args.resume)
             except ValueError as ex:
                 raise RecoveryError(i18n.t("err_scan_file", err=ex)) from None
+            if not scan.meta["source"].get("image") and not disks.is_admin():
+                scan.close()
+                print(i18n.t("admin_needed"), file=sys.stderr)
+                return 2
         else:
             scan = scan_source(source, opts, emit, threading.Event(), args.dest)
         s = recover_session(scan, None, args.dest, opts, emit, threading.Event())

@@ -24,6 +24,7 @@ from .source import Source, SourceLost
 REPORT_DIR = "RecoveryTool-Report"
 IO_CHUNK = 4 * 1024 * 1024
 RESERVE = 64 << 20          # free space that is never used up in the destination
+ANALYZE_STEPS = 3                 # counted steps of the "rebuilding folder structure" phase
 NOT_RECOVERED = "NOT_RECOVERED"   # report only: selected, but the destination was full
 
 _DAMAGE_FLAGS = {"CHAIN_BROKEN", "RUNLIST_INCOMPLETE", "RUN_OUT_OF_RANGE", "TRUNCATED", "READ_ERROR",
@@ -100,6 +101,18 @@ class Engine:
         self.checkpoint = None      # called with the ScanResult now and then during the scan
         self.free_bytes = lambda: shutil.disk_usage(self.dest).free
         self._dirmap = None
+        self._step_t = 0.0
+
+    def step(self, key, done=0, total=0, n=None):
+        """Progress of one step of rebuilding the folder structure, counted in records/files.
+
+        ``n`` numbers the steps that have a counter; the others only say what is going on."""
+        now = time.monotonic()
+        if total and 0 < done < total and now - self._step_t < 0.25:
+            return
+        self._step_t = now
+        text = t("st_count", n=n, of=ANALYZE_STEPS, what=t(key)) if n else t(key)
+        self.emit("progress", done=done, total=total, unit="records", stage=key, text=text)
 
     # -- helpers --------------------------------------------------------------------------------
     def log(self, text):
@@ -136,16 +149,19 @@ class Engine:
                    boot=sum(len(v) for v in res.boot.values())))
 
         self.phase("ph_analyze")
-        self.emit("progress", done=0, total=0, unit="")
+        self.step("st_fat")
         dbg = lambda m: self.emit("debug", text=m)
         for finder in (fat32.find_volumes, exfat.find_volumes):
             self.check()
             self.volumes += finder(self.src, res, dbg)
-        self.volumes += ntfs.find_volumes(self.src, res, dbg, self.cancel)
+        self.step("st_records", 0, max(len(res.mft), 1), n=1)
+        self.volumes += ntfs.find_volumes(self.src, res, dbg, self.cancel,
+                                          lambda done, total: self.step("st_records", done, total, n=1))
         self.check()
+        self.step("st_alloc")
         alloc, unknown = allocation.current_allocation(self.src, dbg)
         accessible = self.accessible if self.accessible is not None else allocation.accessible_starts(self.src)
-        found = []
+        found, nodes = [], 0
         for v in self.volumes:
             if v.start not in accessible:
                 # A filesystem nobody can open any more (lost partition, damaged boot sector):
@@ -153,10 +169,11 @@ class Engine:
                 unlive(v)
             files, dirs = v.count()
             found.append((v.fs, v.label, files, dirs))
+            nodes += files + dirs
             self.log(t("log_volume", fs=v.fs, files=files, dirs=dirs))
         self.emit("volumes", found=found)
 
-        self.plan()
+        self.plan(nodes)
         self.mark_overlaps(alloc, unknown)
         hopeless = 0
         for it in self.items:
@@ -194,8 +211,11 @@ class Engine:
         return None
 
     # -- planning -------------------------------------------------------------------------------
-    def plan(self):
+    def plan(self, nodes=0):
+        """``nodes``: files and folders in all volumes, only used to show how far along it is."""
         used_top = set()
+        visited = [0]
+        self.step("st_plan", 0, max(nodes, 1), n=2)
 
         def unique_top(name):
             base, k = name, 2
@@ -226,6 +246,9 @@ class Engine:
                     if id(ch) in seen or depth > 200:
                         continue
                     seen.add(id(ch))
+                    visited[0] += 1
+                    if visited[0] & 1023 == 0:
+                        self.step("st_plan", visited[0], max(nodes, visited[0]), n=2)
                     kind = "deleted" if ch.deleted else "orphaned" if orphan else "main"
                     name = safe_name(ch.name)
                     base, k = name, 2
@@ -265,11 +288,15 @@ class Engine:
                     used_top.discard(name.lower())
         for i, it in enumerate(self.items):
             it.id = i
+        self.step("st_plan", max(nodes, visited[0], 1), max(nodes, visited[0], 1), n=2)
 
     # -- extraction -----------------------------------------------------------------------------
     def mark_overlaps(self, alloc, unknown):
         """Which bytes of each lost file does something newer sit on?"""
-        for it in self.items:
+        total = len(self.items)
+        for k, it in enumerate(self.items):
+            if k & 1023 == 0:
+                self.step("st_check", k, max(total, 1), n=3)
             n = it.node
             if n.is_dir or n.live:
                 continue
@@ -285,6 +312,7 @@ class Engine:
                 it.notes.append("OVERWRITTEN:%d/%d" % (sum(e - s for s, e in it.bad), n.size))
             if maybe:
                 it.notes.append("MAYBE_OVERWRITTEN:%d/%d" % (maybe, n.size))
+        self.step("st_check", total, max(total, 1), n=3)
 
     def recover(self, items=None):
         """Write catalogue files into the destination; by default everything not recovered yet.

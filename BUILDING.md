@@ -2,7 +2,7 @@
 
 Türkçesi [aşağıda](#kaynaktan-çalıştırma-ve-derleme).
 
-If you only want to use the program, grab `RecoveryTool.exe` from the Releases page. You don't
+If you only want to use the program, grab `Benchwise.exe` from the Releases page. You don't
 need anything on this page.
 
 ## What you need
@@ -31,11 +31,11 @@ Opening an image file works without elevation.
 The same engine is available from the command line:
 
 ```powershell
-.\.venv\Scripts\python -m recoverytool.cli --list
-.\.venv\Scripts\python -m recoverytool.cli --disk 1 --dest E:\Recovered
-.\.venv\Scripts\python -m recoverytool.cli --disk 1 --partition 2 --dest E:\Recovered
-.\.venv\Scripts\python -m recoverytool.cli --image stick.img --dest E:\Recovered
-.\.venv\Scripts\python -m recoverytool.cli --help
+.\.venv\Scripts\python -m benchwise --list
+.\.venv\Scripts\python -m benchwise --disk 1 --dest E:\Recovered
+.\.venv\Scripts\python -m benchwise --disk 1 --partition 2 --dest E:\Recovered
+.\.venv\Scripts\python -m benchwise --image stick.img --dest E:\Recovered
+.\.venv\Scripts\python -m benchwise --help
 ```
 
 `--list` prints every disk with its partitions and unallocated space. `--partition` limits the
@@ -70,11 +70,30 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
 The script creates `.venv` if it is missing, installs the requirements plus PyInstaller, and
-writes `dist\RecoveryTool.exe`. It prints the file size and SHA-256 at the end. Expect about
-17 MB and a build time of a minute or so.
+writes `dist\Benchwise.exe` and `dist\Benchwise-cli.exe`. It prints their sizes and SHA-256
+at the end. Expect about 19 MB and 8 MB and a build time of a minute or two.
 
-The exe is a single file with Python and all libraries inside. It asks for administrator rights
-on start (that is the `--uac-admin` flag in the build script).
+Both are single files with Python and all libraries inside.
+
+- `Benchwise.exe` is the window. It is a window application (no console window flashes up) and
+  starts without administrator rights. Opening a tool marked with a shield asks to restart it as
+  administrator; the elevated copy opens that tool straight away (`--open=disk.recovery`).
+- `Benchwise-cli.exe` is the command line. It runs inside the terminal it is started from:
+  output appears there, the terminal waits for it and Ctrl+C stops it. It does not demand
+  administrator rights up front, because Windows would then run it in a new window that closes
+  when it ends. `--list`, `--scans`, `--image` and `help` work in any terminal; reading a disk
+  (`--disk`, `--resume` of a disk scan, `--unlock-pending`) needs an **administrator** terminal
+  and says so otherwise.
+
+```powershell
+.\Benchwise-cli.exe help
+.\Benchwise-cli.exe --list
+.\Benchwise-cli.exe --disk 1 --partition 2 --dest E:\Recovered --debug > scan.log
+```
+
+`help` (also `-h`, `--help`, `/?`, or no arguments at all) prints every option with what it
+does and examples, in Turkish or English (`--lang tr|en`, default: the Windows language).
+Started with arguments, `Benchwise.exe` only shows a message pointing to the cli exe.
 
 Two things to know before you hand the exe to someone:
 
@@ -135,7 +154,7 @@ To see what the scanner finds in an image without recovering anything:
 ```powershell
 git tag v1.0.2
 git push origin v1.0.2
-gh release create v1.0.2 dist\RecoveryTool.exe --title "v1.0.2" --notes "what changed"
+gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "v1.1.0" --notes "what changed"
 ```
 
 `dist\` is in `.gitignore` on purpose. The exe goes into the release, not into the repository.
@@ -144,7 +163,7 @@ gh release create v1.0.2 dist\RecoveryTool.exe --title "v1.0.2" --notes "what ch
 
 # Kaynaktan çalıştırma ve derleme
 
-Programı sadece kullanmak istiyorsanız Releases sayfasından `RecoveryTool.exe` dosyasını indirin.
+Programı sadece kullanmak istiyorsanız Releases sayfasından `Benchwise.exe` dosyasını indirin.
 Bu sayfadakilere ihtiyacınız yok.
 
 ## Gerekenler
@@ -173,11 +192,11 @@ okumasına izin vermez; yönetici değilseniz disk listesi yine görünür ama k
 Aynı motor komut satırından da kullanılabilir:
 
 ```powershell
-.\.venv\Scripts\python -m recoverytool.cli --list
-.\.venv\Scripts\python -m recoverytool.cli --disk 1 --dest E:\Kurtarilan
-.\.venv\Scripts\python -m recoverytool.cli --disk 1 --partition 2 --dest E:\Kurtarilan
-.\.venv\Scripts\python -m recoverytool.cli --image bellek.img --dest E:\Kurtarilan
-.\.venv\Scripts\python -m recoverytool.cli --help
+.\.venv\Scripts\python -m benchwise --list
+.\.venv\Scripts\python -m benchwise --disk 1 --dest E:\Kurtarilan
+.\.venv\Scripts\python -m benchwise --disk 1 --partition 2 --dest E:\Kurtarilan
+.\.venv\Scripts\python -m benchwise --image bellek.img --dest E:\Kurtarilan
+.\.venv\Scripts\python -m benchwise --help
 ```
 
 `--list` her diski bölümleri ve ayrılmamış alanlarıyla yazar. `--partition` işi tek bir bölümle
@@ -210,12 +229,14 @@ PowerShell çalıştırma ilkesi yüzünden betiği reddederse:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Betik `.venv` yoksa oluşturur, gereksinimleri ve PyInstaller'ı kurar, `dist\RecoveryTool.exe`
-dosyasını üretir. Sonunda dosya boyutunu ve SHA-256 özetini yazar. Yaklaşık 17 MB'lık bir dosya
-ve bir dakika civarı derleme süresi bekleyin.
+Betik `.venv` yoksa oluşturur, gereksinimleri ve PyInstaller'ı kurar, `dist\Benchwise.exe`
+ve `dist\Benchwise-cli.exe` dosyalarını üretir. Sonunda boyutlarını ve SHA-256 özetlerini yazar.
+Yaklaşık 19 MB ve 8 MB'lık dosyalar ve bir iki dakikalık derleme süresi bekleyin.
 
-Exe tek dosyadır; Python ve bütün kitaplıklar içindedir. Açılışta yönetici izni ister (derleme
-betiğindeki `--uac-admin` bunu sağlıyor).
+Exe tek dosyadır; Python ve bütün kitaplıklar içindedir. Yönetici izni istemeden açılır. Kalkan
+işaretli bir araç açılınca Benchwise'ı yönetici olarak yeniden başlatmayı önerir; yetkili kopya
+doğrudan o araçla açılır (`--open=disk.recovery`). Komut satırı için `dist\Benchwise-cli.exe`
+kullanılır.
 
 Exe'yi birine vermeden önce bilmeniz gereken iki şey:
 
@@ -277,7 +298,7 @@ Kurtarma yapmadan, tarayıcının bir imajda ne bulduğunu görmek için:
 ```powershell
 git tag v1.0.2
 git push origin v1.0.2
-gh release create v1.0.2 dist\RecoveryTool.exe --title "v1.0.2" --notes "neler değişti"
+gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "v1.1.0" --notes "neler değişti"
 ```
 
 `dist\` bilerek `.gitignore` içinde. Exe depoya değil, sürüme (release) eklenir.

@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.1.0
+
+The app is now **Benchwise**, a workbench of tools. RecoveryTool lives on as its first tool,
+File Recovery.
+
+Added
+
+- **Benchwise window.** Categories as big cards (Disk, System & Memory, Battery & Power, Display &
+  Input, Network, Windows Repair, Cleanup & Privacy), each with its tool cards, and a path bar at the
+  top to go back. Tools that are not built yet show "Coming soon". A tool keeps running while you
+  look around, so a scan goes on when you go back to the home page.
+- **Administrator rights per tool.** Benchwise starts without them. A tool marked with a shield
+  asks to restart as administrator and the elevated copy opens that tool straight away. The top bar
+  shows "Administrator" or "Standard mode".
+- `Benchwise.exe` and `Benchwise-cli.exe` replace `RecoveryTool.exe`; `python -m benchwise` runs it
+  from source. Saved scans stay where they were (`%LOCALAPPDATA%\RecoveryTool`).
+- **Progress while rebuilding the folder structure.** After the scan, this phase used to show
+  only a still bar, and on a large disk it can take many minutes. It now runs in three counted
+  steps (reading and linking the file records, building the list of files, checking for
+  overwritten data). The live panel shows the current step, the remaining time, the speed in
+  records per second and how many records are done.
+- **Full command-line help.** `help`, `-h`, `--help`, `/?` or no arguments list every option
+  in groups, with what it does and examples, in Turkish or English.
+
+Fixed
+
+- **A command-line exe that works.** `RecoveryTool.exe --list` and the other options printed
+  nothing, because the exe is a window application with no console. The command line now ships
+  as `RecoveryTool-cli.exe`, a console program that runs inside the terminal it is started from:
+  it prints there, the terminal waits for it and Ctrl+C stops it. It does not demand
+  administrator rights up front (that would make Windows open a separate window that closes at
+  the end); commands that read a disk ask for an administrator terminal. `RecoveryTool.exe`
+  stays the desktop app and, given arguments, points to the cli exe.
+
 ## 1.0.2
 
 Changed

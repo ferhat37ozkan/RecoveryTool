@@ -1,6 +1,7 @@
-"""Desktop user interface (customtkinter).
+"""File Recovery tool of Benchwise (customtkinter).
 
-The work goes in two steps.  A scan lists everything that can be recovered and writes nothing;
+``RecoveryView`` is a frame that the Benchwise window shows when the File Recovery card is
+opened; it no longer owns the window.  The work goes in two steps.  A scan lists everything that can be recovered and writes nothing;
 the result is shown as a folder tree with tick boxes.  The user then recovers what is ticked,
 as often as needed: what has been recovered gets a green check mark, the rest stays grey and
 can be fetched later, into another folder or after making room.  A panel on the right shows
@@ -52,16 +53,12 @@ def count(n):
     return "{:,}".format(n).replace(",", " ")
 
 
-class App(ctk.CTk):
-    def __init__(self):
-        super().__init__(fg_color=BG)
-        self.title("%s %s" % (APP_NAME, __version__))
-        self.geometry("1180x800")
-        self.minsize(1000, 700)
-        try:
-            self.iconbitmap(resource("icon.ico"))
-        except tk.TclError:
-            pass
+class RecoveryView(ctk.CTkFrame):
+    """The File Recovery tool.  Lives inside the Benchwise window, which it never closes itself
+    except through ``on_close`` (asked by the window when the user closes it)."""
+
+    def __init__(self, master):
+        super().__init__(master, fg_color=BG)
         self.events = queue.Queue()
         self.control = Control()
         self.worker = None
@@ -88,6 +85,8 @@ class App(ctk.CTk):
         self.first = None               # (idle-corrected time, bytes) of the first progress sample of a phase
         self.last_progress = (0, 0)
         self.samples = deque(maxlen=120)
+        self.unit = "bytes"             # what the progress counts: "bytes", or "records" while rebuilding folders
+        self.stage = None               # sub-step of the current phase; a new one restarts the speed figures
         self.recent = deque(maxlen=7)
         self.dest = tk.StringVar()
         self.find = tk.StringVar()
@@ -98,7 +97,6 @@ class App(ctk.CTk):
         self.opt_image = tk.BooleanVar(value=False)
         self.dest.trace_add("write", lambda *a: (self.update_space(), self.update_selection()))
         self.find.trace_add("write", lambda *a: self.schedule_search())
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.style_tree()
         scale = self.winfo_fpixels("1i") / 96.0
         self.icons = {k: tk.PhotoImage(master=self, data=v) for k, v in icons.build(scale).items()}
@@ -168,13 +166,10 @@ class App(ctk.CTk):
 
         head = ctk.CTkFrame(root, fg_color=BG)
         head.pack(fill="x")
-        ctk.CTkLabel(head, text=APP_NAME, font=("Segoe UI Semibold", 26), text_color=TEXT).pack(side="left")
-        ctk.CTkLabel(head, text="v" + __version__, font=("Segoe UI", 11), text_color=MUTED).pack(side="left", padx=(8, 0), pady=(10, 0))
+        ctk.CTkLabel(head, text=t("tool_recovery"), font=("Segoe UI Semibold", 22), text_color=TEXT).pack(side="left")
         top = dict(height=28, fg_color=CARD, hover_color=BORDER, border_width=1, border_color=BORDER, text_color=TEXT)
-        self.lang_btn = ctk.CTkButton(head, text=t("lang"), width=84, command=self.switch_language, **top)
-        self.lang_btn.pack(side="right")
         self.panel_btn = ctk.CTkButton(head, text=t("panel_show"), width=120, command=self.toggle_panel, **top)
-        self.panel_btn.pack(side="right", padx=(0, 8))
+        self.panel_btn.pack(side="right")
         self.scans_btn = ctk.CTkButton(head, text=t("scans"), width=130, command=self.open_scans, **top)
         self.scans_btn.pack(side="right", padx=(0, 8))
         ctk.CTkLabel(root, text=t("subtitle"), font=("Segoe UI", 12), text_color=MUTED, anchor="w").pack(fill="x", pady=(0, 10))
@@ -357,6 +352,7 @@ class App(ctk.CTk):
             self.pv[key].pack(fill="x", padx=8)
 
         section(t("pg_progress"))
+        block("step")
         for key in ("elapsed", "eta", "speed", "avg", "data"):
             line(key)
         section(t("pg_source"))
@@ -391,16 +387,17 @@ class App(ctk.CTk):
             return
         self.panel_shown = show
         self.panel_btn.configure(text=t("panel_hide" if show else "panel_show"))
-        zoomed = self.state() == "zoomed"
+        win = self.winfo_toplevel()
+        zoomed = win.state() == "zoomed"
         if show:
             self.side.pack(side="right", fill="y", padx=(0, 16), pady=(16, 18), before=self.rootf)
-            if resize and not zoomed and self.winfo_width() + PANEL_WIDTH <= self.winfo_screenwidth() - 40:
+            if resize and not zoomed and win.winfo_width() + PANEL_WIDTH <= win.winfo_screenwidth() - 40:
                 self.grown = PANEL_WIDTH + 16           # widen the window instead of squeezing the lists
-                self.geometry("%dx%d" % (self.winfo_width() + self.grown, self.winfo_height()))
+                win.geometry("%dx%d" % (win.winfo_width() + self.grown, win.winfo_height()))
         else:
             self.side.pack_forget()
             if self.grown and not zoomed:
-                self.geometry("%dx%d" % (max(self.winfo_width() - self.grown, 1000), self.winfo_height()))
+                win.geometry("%dx%d" % (max(win.winfo_width() - self.grown, 1000), win.winfo_height()))
             self.grown = 0
 
     def panel(self, **values):
@@ -413,7 +410,7 @@ class App(ctk.CTk):
 
     def panel_reset(self, what):
         """Blank the figures of a job that is about to start ("scan" or "recover")."""
-        keys = ("elapsed", "eta", "speed", "avg", "data", "bad")
+        keys = ("step", "elapsed", "eta", "speed", "avg", "data", "bad")
         keys += ("mft", "fat", "exfat", "boot", "vols") if what == "scan" else ()
         keys += ("files", "ok", "repaired", "uncertain", "damaged", "failed", "waiting", "free", "current", "recent")
         self.panel(**{k: "–" for k in keys})
@@ -448,7 +445,7 @@ class App(ctk.CTk):
             pts += [x0 + i * step, h - 3 - (h - 16) * v / top]
         g.create_polygon([pts[0], h] + pts + [pts[-2], h], fill="#1b3358", outline="")
         g.create_line(pts, fill=ACCENT, width=2)
-        g.create_text(4, 2, anchor="nw", text=t("graph_peak", speed=human_size(top)), fill=MUTED, font=("Segoe UI", 8))
+        g.create_text(4, 2, anchor="nw", text=t("graph_peak", speed=self.amount(top)), fill=MUTED, font=("Segoe UI", 8))
 
     # -- disk list ------------------------------------------------------------------------------
     def startup_checks(self):
@@ -700,7 +697,7 @@ class App(ctk.CTk):
         win.title(t("letter_title"))
         win.geometry("360x170")
         win.resizable(False, False)
-        win.transient(self)
+        win.transient(self.winfo_toplevel())
         ctk.CTkLabel(win, text=t("letter_prompt", name=part_name(p)), text_color=TEXT, font=("Segoe UI", 13)).pack(pady=(22, 10))
         choice = tk.StringVar(value=free[0])
         ctk.CTkOptionMenu(win, values=free, variable=choice, width=90, fg_color=CARD, button_color=BORDER,
@@ -758,7 +755,7 @@ class App(ctk.CTk):
         win.title(t("ts_title", n=d["number"], name=d["name"]))
         win.geometry("760x560")
         win.minsize(620, 420)
-        win.transient(self)
+        win.transient(self.winfo_toplevel())
         win.disk_number = d["number"]
         head = ctk.CTkFrame(win, fg_color=BG)
         head.pack(fill="x", padx=18, pady=(14, 6))
@@ -860,7 +857,7 @@ class App(ctk.CTk):
                     self.folder_btn.pack(side="left", padx=(10, 0))
                 self.report_btn.pack(side="left", padx=(10, 0))
         state = "disabled" if busy else "normal"
-        for w in [self.refresh_btn, self.image_btn, self.ts_btn, self.browse_btn, self.dest_entry, self.lang_btn,
+        for w in [self.refresh_btn, self.image_btn, self.ts_btn, self.browse_btn, self.dest_entry,
                   self.scans_btn, self.browse_btn2, self.dest_entry2, self.all_btn, self.none_btn] + self.checks:
             w.configure(state=state)
         self.tree.configure(selectmode="none" if busy else "browse")
@@ -1284,7 +1281,7 @@ class App(ctk.CTk):
             pass
         if self.closing and (self.worker is None or not self.worker.is_alive()):
             self.close_session()
-            self.destroy()
+            self.winfo_toplevel().destroy()
             return
         self.after(80, self.poll)
 
@@ -1294,9 +1291,22 @@ class App(ctk.CTk):
             self.panel(elapsed=format_duration(max(time.time() - self.t_start - self.control.idle(), 0)))
         self.after(500, self.tick)
 
+    def amount(self, n):
+        """A progress figure in the unit of the current phase."""
+        return human_size(n) if self.unit == "bytes" else "%s %s" % (count(int(n)), t("u_records"))
+
     def on_progress(self, data):
         total, done = data.get("total") or 0, data.get("done") or 0
         stats = data.get("stats") or {}
+        unit, stage = data.get("unit") or "bytes", data.get("stage")
+        if (unit, stage) != (self.unit, self.stage):    # another counter: its speed and ETA start afresh
+            self.unit, self.stage = unit, stage
+            self.first, self.speed = None, 0.0
+            self.samples.clear()
+            self.draw_graph()
+            self.panel(eta="–", speed="–", avg="–", data="–")
+        if stage:
+            self.panel(step=data.get("text") or "–")
         if total:
             frac = min(done / total, 1.0)
             self.bar.set(frac)
@@ -1312,17 +1322,22 @@ class App(ctk.CTk):
             line = "%.1f%%" % (100.0 * frac)
             if self.speed > 0:
                 left = format_duration((total - done) / self.speed)
-                line = t("eta", pct=100.0 * frac, speed=human_size(self.speed), eta=left)
+                line = t("eta", pct=100.0 * frac, speed=self.amount(self.speed), eta=left)
                 spent = clock - self.first[0]
-                self.panel(eta=left, speed=human_size(self.speed) + t("per_s"),
-                           avg=(human_size((done - self.first[1]) / spent) + t("per_s")) if spent > 1 else "–")
+                self.panel(eta=left, speed=self.amount(self.speed) + t("per_s"),
+                           avg=(self.amount((done - self.first[1]) / spent) + t("per_s")) if spent > 1 else "–")
             if data.get("text"):
                 line += "    " + data["text"][:70]
             self.detail_label.configure(text=line)
             self.p_pct.configure(text=t("pct", pct=100.0 * frac))
-            self.panel(data="%s / %s" % (human_size(done), human_size(total)))
+            if self.unit == "bytes":
+                self.panel(data="%s / %s" % (human_size(done), human_size(total)))
+            else:
+                self.panel(data="%s / %s" % (count(done), self.amount(total)))
         else:
             self.bar.set(0)
+            if data.get("text"):
+                self.detail_label.configure(text=data["text"][:90])
         if "mft" in stats:
             self.panel(mft=count(stats["mft"]), fat=count(stats["fat"]), exfat=count(stats["exfat"]), boot=count(stats["boot"]))
         if "files" in stats:
@@ -1401,7 +1416,8 @@ class App(ctk.CTk):
             self.bar.set(0)
             self.detail_label.configure(text=" ")
             self.first, self.speed = None, 0.0
-            self.panel(eta="–", speed="–", avg="–", data="–")
+            self.unit, self.stage = "bytes", None
+            self.panel(step="–", eta="–", speed="–", avg="–", data="–")
         elif kind == "log":
             text = data["text"]
             self.write("   " + text, "bad" if "COULD NOT" in text or "KALDIRILAMADI" in text else None)
@@ -1488,7 +1504,7 @@ class App(ctk.CTk):
         win.title(t("scans_title"))
         win.geometry("860x460")
         win.minsize(700, 320)
-        win.transient(self)
+        win.transient(self.winfo_toplevel())
         ctk.CTkLabel(win, text=t("scans_hint"), font=("Segoe UI", 12), text_color=MUTED, anchor="w", justify="left",
                      wraplength=800).pack(fill="x", padx=18, pady=(14, 8))
         holder = ctk.CTkFrame(win, fg_color=CARD, corner_radius=10, border_width=1, border_color=BORDER)
@@ -1554,10 +1570,8 @@ class App(ctk.CTk):
         except OSError as ex:
             messagebox.showerror(APP_NAME, str(ex))
 
-    def switch_language(self):
-        if self.busy():
-            return
-        i18n.set_language("en" if i18n.language() == "tr" else "tr")
+    def relabel(self):
+        """Rebuild in the language the window has just switched to (never while busy)."""
         selection = self.tree.selection()
         shown = self.panel_shown
         self.clear_rows()
@@ -1569,22 +1583,19 @@ class App(ctk.CTk):
             self.show_panel(True, resize=False)
 
     def on_close(self):
+        """The window is being closed.  Returns True when it may close right away; otherwise
+        the running job is being stopped and the window closes when the worker has finished."""
         if self.worker is not None and self.worker.is_alive():
             if self.mode in ("scan", "recover") and not messagebox.askyesno(APP_NAME, t("closing_busy")):
-                return
+                return False
             self.closing = True
             self.request_cancel()       # the worker releases the write protection before it ends
-        else:
-            self.close_session()
-            self.destroy()
+            return False
+        self.close_session()
+        return True
 
 
 def main():
-    forced = os.environ.get("RECOVERYTOOL_LANG")          # "en" or "tr" overrides the Windows language
-    i18n.set_language(forced) if forced else i18n.detect()
-    ctk.set_appearance_mode("dark")
-    App().mainloop()
-
-
-if __name__ == "__main__":
-    main()
+    """Kept for old shortcuts: starts Benchwise straight in the File Recovery tool."""
+    from benchwise.shell import main as shell_main
+    shell_main(open_tool="disk.recovery")
