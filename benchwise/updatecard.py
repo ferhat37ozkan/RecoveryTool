@@ -70,7 +70,7 @@ class UpdateNotice:
         titles.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(titles, text=t("up_panel_title", v=info["version"]), font=("Segoe UI Semibold", 22),
                      text_color=TEXT, anchor="w").pack(fill="x")
-        ctk.CTkLabel(titles, text=t("up_panel_sub", cur=__version__, date=info["date"] or "–"), font=("Segoe UI", 12),
+        ctk.CTkLabel(titles, text=t("up_panel_sub", cur=update.current_version(), date=info["date"] or "–"), font=("Segoe UI", 12),
                      text_color=MUTED, anchor="w").pack(fill="x")
         ctk.CTkLabel(p, text=t("up_recommend"), font=("Segoe UI", 13), text_color=BLINK[0], anchor="w",
                      justify="left", wraplength=540).pack(fill="x", padx=24, pady=(6, 8))

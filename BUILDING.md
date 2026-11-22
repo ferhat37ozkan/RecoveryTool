@@ -164,7 +164,9 @@ gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "Benc
 (`benchwise/__init__.py`) a few seconds after start. If its tag is newer than the running version
 (not a draft or pre-release), a card with a blinking amber frame appears at the bottom right; it
 opens a panel with the release notes and a download button (the release's `Benchwise.exe`). Only a
-`Benchwise/<version>` user agent is sent. `BENCHWISE_NO_UPDATE_CHECK=1` turns the check off.
+`Benchwise/<version>` user agent is sent. `BENCHWISE_NO_UPDATE_CHECK=1` turns the check off;
+`BENCHWISE_TEST_VERSION=1.0.9` makes the check treat the running program as that version, to try the
+notice against a real release (`$env:BENCHWISE_TEST_VERSION='1.0.9'; .\dist\Benchwise.exe`).
 
 **Release notes format.** The panel shows the part in the user's language, tool by tool:
 
@@ -329,7 +331,9 @@ gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "Benc
 (`benchwise/__init__.py`) son sürümünü sorar. Etiket çalışan sürümden yeniyse (taslak veya ön sürüm
 değilse) sağ altta sarı-turuncu çerçevesi yanıp sönen bir kart çıkar; kart, sürüm notlarını ve
 indirme düğmesini (sürümdeki `Benchwise.exe`) gösteren bir panel açar. Yalnızca `Benchwise/<sürüm>`
-tanıtıcısı gönderilir. `BENCHWISE_NO_UPDATE_CHECK=1` kontrolü kapatır.
+tanıtıcısı gönderilir. `BENCHWISE_NO_UPDATE_CHECK=1` kontrolü kapatır; `BENCHWISE_TEST_VERSION=1.0.9`
+kontrolün programı o sürümdeymiş gibi görmesini sağlar, böylece bildirim gerçek bir sürüme karşı
+denenebilir (`$env:BENCHWISE_TEST_VERSION='1.0.9'; .\dist\Benchwise.exe`).
 
 **Sürüm notu biçimi.** Panel, kullanıcının dilindeki bölümü araç araç gösterir: her dil `<!-- tr -->`
 / `<!-- en -->` (ya da `## Türkçe` / `## English`) ile başlar, içinde `### Araç` başlıkları ve `- `

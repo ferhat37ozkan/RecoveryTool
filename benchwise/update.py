@@ -3,7 +3,8 @@
 One request to the public GitHub API (latest release of the repository), in the background,
 shortly after start.  Only a "Benchwise/<version>" user agent is sent; no data about the user or
 the computer.  Without network, or on any error, it simply says nothing.
-Set BENCHWISE_NO_UPDATE_CHECK=1 to switch it off.
+Set BENCHWISE_NO_UPDATE_CHECK=1 to switch it off.  For testing the notice against a real release,
+BENCHWISE_TEST_VERSION=1.0.9 makes the check (and only the check) treat this program as that version.
 """
 
 from __future__ import annotations
@@ -24,8 +25,13 @@ def version_tuple(text):
     return tuple(int(x) for x in m.group(1).split(".")) if m else ()
 
 
-def newer(latest, current=__version__):
-    a, b = version_tuple(latest), version_tuple(current)
+def current_version():
+    """The version the update check compares with: the real one, unless a test overrides it."""
+    return os.environ.get("BENCHWISE_TEST_VERSION") or __version__
+
+
+def newer(latest, current=None):
+    a, b = version_tuple(latest), version_tuple(current or current_version())
     return bool(a) and a > b
 
 

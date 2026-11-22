@@ -1,38 +1,5 @@
 # Changelog
 
-## Unreleased
-
-Added
-
-- **Disk Health** (Disk > Disk Health). Every disk with a plain verdict: Healthy, Watch it, At risk or
-  No data, and the reasons in everyday words (what it means, what to do). Tiles for temperature,
-  power-on time, wear, reallocated and pending sectors, uncorrected errors and power cycles; disk
-  details; and the full ATA SMART table with the attributes that matter coloured. Unknown values are
-  shown as "not reported", never as 0. USB enclosures and RAID arrays that hide health data get an
-  explanation instead of a guess. "Recover files from this disk" opens File Recovery with the disk
-  selected. Demo data: `BENCHWISE_FAKE_HEALTH=docs\demo-health.json`; tests: `tests\test_diskhealth.py`.
-- **Disks inside AMD RAID arrays.** Windows only sees the array; the disks in it are now listed one by
-  one with their own verdict (temperature, wear, spare, data written, media errors, unexpected
-  shutdowns for NVMe; the SMART table for SATA). This uses AMD_RC2t7, a third-party library by Gakuto
-  Matsumura that CrystalDiskInfo also uses. It is not shipped: on request it is downloaded from its
-  official site with a progress bar, accepted only if its SHA-256 matches the pinned release and its
-  signature is valid, and run in a separate process that is never killed. Source, developer and a
-  disclaimer are shown wherever it is used. NVMe health checks (critical warning bits, spare below
-  threshold, media errors, time above critical temperature) apply to every NVMe disk.
-- **New version notice.** A card with a blinking amber frame at the bottom right when GitHub has a
-  newer release; it opens a panel with the release notes in the interface language, tool by tool
-  (format: `docs/release-notes/`). `BENCHWISE_NO_UPDATE_CHECK=1` turns it off.
-
-Fixed
-
-- The log box at the bottom of File Recovery cut its top line in half: its height was not a whole
-  number of lines, and when the window was short it was squeezed below the requested size. It now
-  shows exactly 3 lines (5 on the results page), keeps the last line in view, and a short window
-  shrinks the disk and file lists (they scroll) instead of the log or the options.
-- Benchwise opens in the middle of the screen; the title reads Benchwise@idlepose.com.
-- Switching pages no longer redraws them: pages and tools stay laid out and are only raised, category
-  pages are built in the background, and Disk Health swaps its detail in one go.
-
 ## 1.1.0
 
 The app is now **Benchwise**, a workbench of tools. RecoveryTool lives on as its first tool,
@@ -56,16 +23,41 @@ Added
   records per second and how many records are done.
 - **Full command-line help.** `help`, `-h`, `--help`, `/?` or no arguments list every option
   in groups, with what it does and examples, in Turkish or English.
+- **Disk Health** (Disk > Disk Health). Every disk with a plain verdict: Healthy, Watch it, At risk or
+  No data, and the reasons in everyday words (what it means, what to do). Tiles for temperature,
+  power-on time, wear, reallocated and pending sectors, uncorrected errors and power cycles; disk
+  details; and the full ATA SMART table with the attributes that matter coloured. Unknown values are
+  shown as "not reported", never as 0. USB enclosures and RAID arrays that hide health data get an
+  explanation instead of a guess. "Recover files from this disk" opens File Recovery with the disk
+  selected. Demo data: `BENCHWISE_FAKE_HEALTH=docs\demo-health.json`; tests: `tests\test_diskhealth.py`.
+- **Disks inside AMD RAID arrays.** Windows only sees the array; the disks in it are now listed one by
+  one with their own verdict (temperature, wear, spare, data written, media errors, unexpected
+  shutdowns for NVMe; the SMART table for SATA). This uses AMD_RC2t7, a third-party library by Gakuto
+  Matsumura that CrystalDiskInfo also uses. It is not shipped: on request it is downloaded from its
+  official site with a progress bar, accepted only if its SHA-256 matches the pinned release and its
+  signature is valid, and run in a separate process that is never killed. Source, developer and a
+  disclaimer are shown wherever it is used. NVMe health checks (critical warning bits, spare below
+  threshold, media errors, time above critical temperature) apply to every NVMe disk.
+- **New version notice.** A card with a blinking amber frame at the bottom right when GitHub has a
+  newer release; it opens a panel with the release notes in the interface language, tool by tool
+  (format: `docs/release-notes/`). `BENCHWISE_NO_UPDATE_CHECK=1` turns it off.
 
 Fixed
 
 - **A command-line exe that works.** `RecoveryTool.exe --list` and the other options printed
   nothing, because the exe is a window application with no console. The command line now ships
-  as `RecoveryTool-cli.exe`, a console program that runs inside the terminal it is started from:
+  as `Benchwise-cli.exe`, a console program that runs inside the terminal it is started from:
   it prints there, the terminal waits for it and Ctrl+C stops it. It does not demand
   administrator rights up front (that would make Windows open a separate window that closes at
   the end); commands that read a disk ask for an administrator terminal. `RecoveryTool.exe`
   stays the desktop app and, given arguments, points to the cli exe.
+- The log box at the bottom of File Recovery cut its top line in half: its height was not a whole
+  number of lines, and when the window was short it was squeezed below the requested size. It now
+  shows exactly 3 lines (5 on the results page), keeps the last line in view, and a short window
+  shrinks the disk and file lists (they scroll) instead of the log or the options.
+- Benchwise opens in the middle of the screen; the title reads Benchwise@idlepose.com.
+- Switching pages no longer redraws them: pages and tools stay laid out and are only raised, category
+  pages are built in the background, and Disk Health swaps its detail in one go.
 
 ## 1.0.2
 

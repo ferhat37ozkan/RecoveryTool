@@ -18,6 +18,10 @@ def test_versions():
     assert update.version_tuple("v1.10.2") == (1, 10, 2) and update.version_tuple("x") == ()
     assert update.newer("v1.10.0", "1.9.9") and update.newer("1.1.1", "1.1.0") and update.newer("2", "1.9")
     assert not update.newer("v1.1.0", "1.1.0") and not update.newer("v1.0.2", "1.1.0") and not update.newer("", "1.0")
+    os.environ["BENCHWISE_TEST_VERSION"] = "1.0.9"           # test switch: pretend to be an older version
+    assert update.current_version() == "1.0.9" and update.newer("v1.1.0")
+    del os.environ["BENCHWISE_TEST_VERSION"]
+    assert update.current_version() == update.__version__
 
 
 def test_notes():
