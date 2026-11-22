@@ -170,6 +170,7 @@ def table(parent, columns, height=8, stretch=None):
     top = parent.winfo_toplevel()
     if id(top) not in _style_done:
         s = ttk.Style(top)
+        s.theme_use("default")          # the Windows themes ignore heading colours (white headings)
         s.configure("Tool.Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT, rowheight=26,
                     borderwidth=0, font=("Segoe UI", 10))
         s.configure("Tool.Treeview.Heading", background=BORDER, foreground=MUTED, relief="flat",

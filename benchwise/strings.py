@@ -358,7 +358,8 @@ i18n.STRINGS.update({
     "tool_memtest_d": ("A quick test now, or the full Windows test at the next restart",
                        "Şimdi hızlı test ya da sonraki açılışta Windows'un tam testi"),
     "tool_crash": ("Crash Analysis", "Çökme Analizi"),
-    "tool_crash_d": ("Find which driver caused a blue screen", "Mavi ekrana hangi sürücünün yol açtığını bulun"),
+    "tool_crash_d": ("Blue screens explained, hardware errors, unexpected shutdowns",
+                     "Mavi ekranların açıklaması, donanım hataları, beklenmedik kapanmalar"),
     "tool_stress": ("CPU Stress Test", "İşlemci Stres Testi"),
     "tool_stress_d": ("Load every core and watch for errors", "Bütün çekirdekleri yükleyin ve hataları izleyin"),
     # --- tools: power ---
