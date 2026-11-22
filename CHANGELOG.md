@@ -33,6 +33,33 @@ Added
 - Ticking a disk that reports no temperature (most USB enclosures) warns that it would show "?" and asks first.
 - Ticking an AMD RAID array for the clock first offers to set up AMD_RC2t7 (the array reports no
   temperature itself); the disks inside it are then ticked one by one.
+- **Every category now has working tools** (until now most cards said "Coming soon"):
+  - *Display & input:* dead-pixel test (full-screen colours and a flashing pattern), keyboard test
+    (Turkish-Q layout, every key lights up), mouse test (buttons, wheel, double-click fault detection),
+    speaker and microphone test (left / right / sweep tones, live level meter), camera check (devices,
+    privacy setting, opens the Camera app).
+  - *System:* system information (save / copy), memory test (quick in-app test plus Windows Memory
+    Diagnostic and its last result), crash analysis (blue screens with their codes explained, unexpected
+    shutdowns, hardware errors, minidumps), CPU stress test with temperature cut-off.
+  - *Power:* battery health (design vs. full capacity, wear, powercfg report), wake & sleep diagnosis
+    (what woke the PC, wake timers, what keeps it awake, devices allowed to wake it).
+  - *Network:* step-by-step connection diagnosis (adapter, address, gateway, DNS, internet, captive
+    portal), speed test (Cloudflare; download, upload, latency, route), Wi-Fi analysis (networks,
+    channels, best 2.4 GHz channel, saved profiles), network reset (DNS flush, renew, Winsock, TCP/IP;
+    restore point first).
+  - *Windows repair:* SFC and DISM with progress, Windows Update repair (recent failures explained,
+    component reset), driver problems (problem codes, old third-party drivers, driver backup),
+    startup programs and services (turn on / off).
+  - *Cleanup & privacy:* junk files by category (you choose what is deleted; the Recycle Bin is never
+    ticked by default; links and junctions are never followed), duplicate finder (byte-identical files;
+    removed copies go to the Recycle Bin, one copy of each group is always kept), space analyzer.
+  - *Disk:* surface scan (reads every sector and maps slow and unreadable areas), speed test (uncached
+    sequential and 4 KB random), disk repair checks (both GPT copies, boot sector backups, read-only
+    chkdsk), image to file (with SHA-256 and a report), partitions (layout and partition table backup),
+    secure erase preview.
+  - Everything that would write to a disk directly - repairing, cloning or restoring to a disk,
+    creating / deleting / formatting partitions, erasing, the fake-capacity fill and wiping free space -
+    is shown but locked in this version.
 
 Fixed
 
