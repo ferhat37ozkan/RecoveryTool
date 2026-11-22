@@ -459,7 +459,8 @@ class Shell(ctk.CTk):
             passage_cli.set_autostart(self.passage_on)
             self.tray_version = -1
             self.passage_show()
-            (messagebox.showinfo if prog.get("ok") else messagebox.showwarning)(t("ps_name"), prog.get("text", ""))
+            if not prog.get("ok"):          # success shows in the switch and the icon; only a failure is told
+                messagebox.showwarning(t("ps_name"), prog.get("text", ""))
             return
         if time.time() - self.passage_busy > 600:         # the elevated step never reported back
             self.passage_busy = None
