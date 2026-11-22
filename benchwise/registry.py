@@ -89,7 +89,7 @@ CATEGORIES = [
         Tool("display.camera", "camera", view=_tool("camera")),
     ]),
     Category("network", "globe", [
-        Tool("network.netdiag", "route"),
+        Tool("network.netdiag", "route", view=_tool("netdiag")),
         Tool("network.netspeed", "gauge"),
         Tool("network.wifi", "wifi"),
         Tool("network.netreset", "refresh", admin=True),
