@@ -68,7 +68,7 @@ CATEGORIES = [
         Tool("disk.repair", "wrench", admin=True, view=_tool("repair")),
         Tool("disk.image", "copy", admin=True, view=_tool("image")),
         Tool("disk.partitions", "pie", admin=True, view=_tool("partitions")),
-        Tool("disk.erase", "shred", admin=True),
+        Tool("disk.erase", "shred", admin=True, view=_tool("erase")),
         Tool("disk.speed", "gauge", view=_tool("speed")),
     ]),
     Category("system", "chip", [
