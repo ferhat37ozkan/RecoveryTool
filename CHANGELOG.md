@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 1.3.0
+
+Added
+
+- **Passage.** A switch at the top right opens sites and apps that are blocked in Turkey, without a
+  VPN. Layer 1: the active adapters get Cloudflare DNS with Windows' own DNS over HTTPS (the previous
+  settings are saved and restored exactly; plain Cloudflare DNS if the network refuses DoH). Layer 2,
+  only if layer 1 is not enough: zapret's winws runs as the `BenchwisePassage` service with presets for
+  Turkish providers, tried in turn (voice chat over UDP included). zapret is downloaded once from its
+  GitHub release (SHA-256 checked) into %ProgramData%\Benchwise\Passage, which standard users can
+  read but not change. Both layers survive a restart; Benchwise starts next to the clock at sign-in.
+- Passage icon next to the clock in the shape of the active connection (Wi-Fi or Ethernet): grey off,
+  orange while switching, green on; right-click to switch; a tick in the Passage window hides it.
+- `Benchwise-cli.exe --hideme [on|off|status]` and `Benchwise.exe --hideme [on|off]` (no window).
+
+Fixed
+
+- Live monitoring: a Benchwise in another folder no longer opens the copy the task starts; its
+  elevated start moves the task to it. A sign-in start hands over to the elevated copy.
+- A window put away next to the clock always keeps its icons.
+
 ## 1.2.1
 
 Added
