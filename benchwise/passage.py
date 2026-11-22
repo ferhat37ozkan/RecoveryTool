@@ -193,6 +193,12 @@ def _progress(report, key, **kw):
 
 
 def _finish(ok, message):
+    try:                                # also in the state: readable even if the progress file is not
+        st = load_state()
+        st.update(finished=time.time(), last_ok=ok, last_message=message)
+        _save_state(st)
+    except OSError:
+        pass
     try:
         with open(_progress_path(), "w", encoding="utf-8") as f:
             json.dump({"time": time.time(), "text": message, "done": True, "ok": ok}, f)
@@ -214,8 +220,11 @@ def _harden_root():
     winws.exe from here as SYSTEM, so nobody else may swap it."""
     os.makedirs(root(), exist_ok=True)
     base = os.path.dirname(root())
+    # the folder itself gets the rules; everything inside inherits them (a file cannot take the
+    # (OI)(CI) inheritance flags, so the rules are not applied to files one by one)
     _run(["icacls", base, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F",
-          "*S-1-5-32-545:(OI)(CI)RX", "/T", "/C", "/Q"])
+          "*S-1-5-32-545:(OI)(CI)RX", "/C", "/Q"])
+    _run(["icacls", os.path.join(base, "*"), "/reset", "/T", "/C", "/Q"])
 
 
 # -- checks ---------------------------------------------------------------------------------------
@@ -515,7 +524,7 @@ def disable(report=None, quiet=False):
         state = load_state()
         if state.get("dns_saved"):
             _restore_dns(state["dns_saved"])
-        _save_state({"enabled": False, "preset": state.get("preset")})
+        _save_state({"enabled": False, "preset": state.get("preset")})    # _finish adds "finished"
         _flush_dns()
         return (True, t("ps_done_off")) if quiet else _finish(True, t("ps_done_off"))
     except Exception as ex:

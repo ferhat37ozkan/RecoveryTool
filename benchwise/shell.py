@@ -432,6 +432,7 @@ class Shell(ctk.CTk):
         if self.passage_busy or want == self.passage_on:
             return self.passage_show()
         self.passage_busy = time.time()
+        self.passage_want = want
         self.passage_show()
         if self.admin:
             threading.Thread(target=lambda: _quiet(passage.enable if want else passage.disable),
@@ -445,6 +446,10 @@ class Shell(ctk.CTk):
         from . import passage, passage_cli
         prog = passage.read_progress() or {}
         fresh = prog.get("time", 0) >= self.passage_busy - 1
+        if not prog:                        # progress unreadable: the saved state tells when it is done
+            st = passage.load_state()
+            if st.get("finished", 0) >= self.passage_busy - 1:
+                prog, fresh = {"done": True, "ok": st.get("last_ok"), "text": st.get("last_message", "")}, True
         if fresh and prog.get("done"):
             self.passage_busy = None
             self.passage_on = passage.is_on()
