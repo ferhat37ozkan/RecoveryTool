@@ -85,7 +85,7 @@ CATEGORIES = [
         Tool("display.pixels", "pixels", view=_tool("pixels")),
         Tool("display.keyboard", "keyboard", view=_tool("keyboard")),
         Tool("display.mouse", "mouse", view=_tool("mouse")),
-        Tool("display.audio", "speaker"),
+        Tool("display.audio", "speaker", view=_tool("audio")),
         Tool("display.camera", "camera"),
     ]),
     Category("network", "globe", [
