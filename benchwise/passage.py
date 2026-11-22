@@ -333,7 +333,8 @@ def _apply_dns(adapters, encrypted=True):
                      "-AllowFallbackToUdp $false -AutoUpgrade $true -ErrorAction Stop | Out-Null } catch {}"
                      % (s, DOH_TEMPLATE))
     for a in adapters:
-        lines.append("Set-DnsClientServerAddress -InterfaceIndex %d -ServerAddresses @(%s)" % (a["index"], servers))
+        # the DoH settings first: the DNS client reads them when the adapter's servers change, so the
+        # servers are set afterwards (reset first, so the change is seen even when they were the same)
         for fam, lst in ((4, CLOUDFLARE_V4), (6, CLOUDFLARE_V6)):
             for s in lst:
                 key = _doh_key(a["guid"], fam) + "\\" + s
@@ -345,6 +346,8 @@ def _apply_dns(adapters, encrypted=True):
                                  "| Out-Null" % (key, DOH_TEMPLATE))
                 else:
                     lines.append("Remove-Item -Path '%s' -Recurse -Force -ErrorAction SilentlyContinue" % key)
+        lines.append("Set-DnsClientServerAddress -InterfaceIndex %d -ResetServerAddresses" % a["index"])
+        lines.append("Set-DnsClientServerAddress -InterfaceIndex %d -ServerAddresses @(%s)" % (a["index"], servers))
     lines.append("Clear-DnsClientCache")
     _ps("\n".join(lines))
 
