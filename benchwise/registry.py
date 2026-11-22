@@ -104,7 +104,7 @@ CATEGORIES = [
         Tool("cleanup.junk", "broom", view=_tool("junk")),
         Tool("cleanup.dupes", "copy", view=_tool("dupes")),
         Tool("cleanup.wipefree", "shred", admin=True),
-        Tool("cleanup.space", "pie"),
+        Tool("cleanup.space", "pie", view=_tool("space")),
     ]),
 ]
 
