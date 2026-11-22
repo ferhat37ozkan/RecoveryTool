@@ -6,7 +6,13 @@ without administrator rights; a tool that needs them restarts it elevated with
 ships as its own console executable, Benchwise-cli.exe (see run_cli.py).
 """
 
+import os
 import sys
+
+# Copies of ourselves (the AMD RAID helper, the elevated restart, the restart after an update)
+# must unpack into their own _MEI folder.  Otherwise PyInstaller 6 lets them share ours, they keep
+# it in use, and our bootloader shows "Failed to remove temporary directory" when we close.
+os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
 
 args = sys.argv[1:]
 if len(args) in (3, 5) and args[0] == "--amdrc2-helper":     # Disk Health: reads AMD RAID members
