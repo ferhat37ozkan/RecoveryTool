@@ -65,7 +65,7 @@ CATEGORIES = [
         Tool("disk.recovery", "recover", admin=True, view=_recovery),
         Tool("disk.health", "pulse", admin=True, view=_health),
         Tool("disk.surface", "grid", admin=True, view=_tool("surface")),
-        Tool("disk.repair", "wrench", admin=True),
+        Tool("disk.repair", "wrench", admin=True, view=_tool("repair")),
         Tool("disk.image", "copy", admin=True),
         Tool("disk.partitions", "pie", admin=True),
         Tool("disk.erase", "shred", admin=True),
