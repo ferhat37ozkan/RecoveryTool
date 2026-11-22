@@ -1,16 +1,16 @@
-"""Passage (Geçit): opens sites that are blocked in Turkey - Discord first - without a VPN.
+"""Passage (Geçit): opens sites and apps that are blocked in Turkey, without a VPN.
 
 Blocks in Turkey come in two layers, and Passage answers them one at a time, stopping at the first
 that is enough (so most PCs never get a driver):
 
-1. **DNS.**  The ISP's DNS answers ``discord.com`` with the address of its warning page.  Passage
+1. **DNS.**  The ISP's DNS answers a blocked name with the address of its warning page.  Passage
    points the active network adapters at Cloudflare DNS (1.1.1.1) and turns on Windows' own
    encrypted DNS (DNS over HTTPS) for them, so the ISP can neither read nor replace the answers.
    The previous settings are saved and put back exactly when Passage is switched off.
 2. **DPI.**  Where the ISP also reads the site name in the first packet of a connection (SNI), Passage
    runs zapret's ``winws`` as a Windows service (``BenchwisePassage``).  winws reshapes only the
    packets of the listed sites (fake packets, split packets) so the ISP's filter cannot match them,
-   and handles Discord's voice (UDP) too.  Presets for Turkish ISPs are tried in turn and the first
+   and handles voice chat (UDP) too.  Presets for Turkish ISPs are tried in turn and the first
    one that gets through is kept.  zapret is downloaded once from its official GitHub release
    (SHA-256 checked) into %ProgramData%\\Benchwise\\Passage, readable but not writable for
    standard users, since the service runs as SYSTEM.
@@ -61,7 +61,7 @@ _HOSTS = ",".join(DOMAINS)
 _COMMON_HEAD = "--wf-tcp=80,443 --wf-udp=443,50000-50100"
 _VOICE = ("--new --filter-udp=443 --hostlist-domains=%s --dpi-desync=fake --dpi-desync-repeats=6 "
           "--new --filter-udp=50000-50100 --filter-l7=discord,stun --dpi-desync=fake --dpi-desync-repeats=6" % _HOSTS)
-# (id, name shown, winws arguments): tried in this order, the first that reaches Discord is kept.
+# (id, name shown, winws arguments): tried in this order, the first that gets through is kept.
 PRESETS = [
     ("tt", "Türk Telekom / TurkNet",
      "%s --filter-tcp=80,443 --hostlist-domains=%s --dpi-desync=fake,multisplit --dpi-desync-split-pos=1,midsld "
@@ -93,37 +93,41 @@ i18n.STRINGS.update({
                          "Paket motoru indiriliyor (zapret, bir kez)…"),
     "ps_step_preset": ("Trying the {name} setting…", "{name} ayarı deneniyor…"),
     "ps_step_off": ("Putting the previous settings back…", "Önceki ayarlar geri yükleniyor…"),
-    "ps_done_dns": ("Passage is on: encrypted DNS was enough, Discord opens.",
-                    "Geçit açık: şifreli DNS yetti, Discord açılıyor."),
-    "ps_done_dpi": ("Passage is on with the {name} setting: Discord opens.",
-                    "Geçit {name} ayarıyla açık: Discord açılıyor."),
+    "ps_done_dns": ("Passage is on: encrypted DNS was enough, blocked sites open.",
+                    "Geçit açık: şifreli DNS yetti, engellenen siteler açılıyor."),
+    "ps_done_plain": ("Passage is on: Cloudflare DNS was enough, blocked sites open (this network refuses "
+                      "encrypted DNS).", "Geçit açık: Cloudflare DNS yetti, engellenen siteler açılıyor (bu ağ "
+                      "şifreli DNS'e izin vermiyor)."),
+    "ps_done_dpi": ("Passage is on with the {name} setting: blocked sites open.",
+                    "Geçit {name} ayarıyla açık: engellenen siteler açılıyor."),
     "ps_done_off": ("Passage is off; the previous network settings are back.",
                     "Geçit kapalı; önceki ağ ayarları geri yüklendi."),
     "ps_fail_offline": ("There is no internet connection, so Passage was not switched on.",
                         "İnternet bağlantısı yok; Geçit açılmadı."),
-    "ps_fail_all": ("No setting got through to Discord on this connection. Everything was put back.",
-                    "Bu bağlantıda hiçbir ayar Discord'a ulaşamadı. Her şey geri alındı."),
+    "ps_fail_all": ("No setting got through the block on this connection. Everything was put back.",
+                    "Bu bağlantıda hiçbir ayar engeli aşamadı. Her şey geri alındı."),
     "ps_fail_other": ("Another bypass tool is running ({name}). Switch it off first.",
                       "Başka bir engel aşma aracı çalışıyor ({name}). Önce onu kapatın."),
     "ps_fail_error": ("Passage could not be switched: {err}", "Geçit değiştirilemedi: {err}"),
     "ps_tray": ("Passage: {state}", "Geçit: {state}"),
     "ps_now": ("Now: {state}", "Şu an: {state}"),
-    "ps_info": ("Passage opens Discord and other sites blocked in Turkey, without a VPN and without slowing "
+    "ps_info": ("Passage opens sites and apps blocked in Turkey, without a VPN and without slowing "
                 "anything else down.\n\n"
                 "1. It turns on encrypted DNS (Cloudflare), so your provider cannot redirect the site to its "
                 "warning page.\n"
                 "2. Only if that is not enough, it starts a small packet engine (zapret) that changes the shape of "
-                "the packets going to those sites, so the provider's filter cannot recognise them; Discord voice "
+                "the packets going to those sites, so the provider's filter cannot recognise them; voice chat "
                 "is covered too.\n\n"
                 "It stays on after a restart. Switching it off puts your previous network settings back exactly.",
-                "Geçit, Discord'u ve Türkiye'de engellenen diğer siteleri VPN olmadan, başka hiçbir şeyi "
+                "Geçit, Türkiye'de engellenen site ve uygulamaları VPN olmadan, başka hiçbir şeyi "
                 "yavaşlatmadan açar.\n\n"
                 "1. Şifreli DNS'i (Cloudflare) açar; böylece servis sağlayıcınız siteyi uyarı sayfasına "
                 "yönlendiremez.\n"
                 "2. Bu yetmezse küçük bir paket motorunu (zapret) başlatır: o sitelere giden paketlerin şeklini "
-                "değiştirir, sağlayıcının filtresi onları tanıyamaz. Discord sesli sohbet de dahildir.\n\n"
+                "değiştirir, sağlayıcının filtresi onları tanıyamaz. Sesli sohbet de dahildir.\n\n"
                 "Bilgisayar yeniden başlasa da açık kalır. Kapattığınızda önceki ağ ayarlarınız aynen geri gelir."),
     "ps_state_dns": ("Encrypted DNS", "Şifreli DNS"),
+    "ps_state_plain": ("Cloudflare DNS (not encrypted)", "Cloudflare DNS (şifresiz)"),
     "ps_state_dpi": ("Encrypted DNS + packet engine ({name})", "Şifreli DNS + paket motoru ({name})"),
 })
 
@@ -249,6 +253,16 @@ def _probe_twice():
     return probe()
 
 
+def _wait_online(seconds):
+    deadline = time.time() + seconds
+    while True:
+        if online():
+            return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(1.0)
+
+
 def online():
     return probe(CONTROL_HOST) or probe("www.cloudflare.com")
 
@@ -286,7 +300,7 @@ def summary():
         return t("ps_off")
     if st.get("layer") == "dpi":
         return t("ps_state_dpi", name=st.get("preset_name", "?"))
-    return t("ps_state_dns")
+    return t("ps_state_dns" if st.get("encrypted", True) else "ps_state_plain")
 
 
 # -- layer 1: DNS -----------------------------------------------------------------------------------
@@ -419,7 +433,7 @@ def _install_service(args):
     p = _run(["sc", "create", SERVICE, "binPath=", bin_path, "start=", "auto", "DisplayName=", "Benchwise Passage"])
     if p.returncode != 0:
         raise RuntimeError((p.stdout or p.stderr).strip() or "sc create failed")
-    _run(["sc", "description", SERVICE, "Benchwise Passage: opens Discord and other sites blocked in Turkey "
+    _run(["sc", "description", SERVICE, "Benchwise Passage: opens sites blocked in Turkey "
           "without a VPN (zapret winws). Switch it off in Benchwise."])
     _run(["sc", "failure", SERVICE, "reset=", "86400", "actions=", "restart/5000/restart/10000/restart/60000"])
     p = _run(["sc", "start", SERVICE])
@@ -477,18 +491,18 @@ def enable(report=None):
         # layer 1: encrypted DNS
         _progress(report, "ps_step_dns")
         _apply_dns(state["dns_saved"], encrypted=True)
-        time.sleep(1.0)
-        if not online():                                # encrypted DNS refused on this network: plain Cloudflare
+        encrypted = _wait_online(10)                    # Windows needs a moment for its first DoH connection
+        if not encrypted:                               # encrypted DNS refused on this network: plain Cloudflare
             _apply_dns(state["dns_saved"], encrypted=False)
-            time.sleep(1.0)
-        state.update(enabled=True, layer="dns", since=time.time())
+            _wait_online(6)
+        state.update(enabled=True, layer="dns", encrypted=encrypted, since=time.time())
         _save_state(state)
         if _probe_twice():
             _remove_service()
             state.pop("preset", None)
             state.pop("preset_name", None)
             _save_state(state)
-            return _finish(True, t("ps_done_dns"))
+            return _finish(True, t("ps_done_dns" if encrypted else "ps_done_plain"))
         # layer 2: packet engine, presets in turn
         if not engine_ready():
             _progress(report, "ps_step_download")
