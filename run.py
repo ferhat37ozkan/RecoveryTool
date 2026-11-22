@@ -13,9 +13,11 @@ if len(args) == 3 and args[0] == "--amdrc2-helper":     # Disk Health: reads AMD
     from benchwise.diskhealth.amdraid import helper_main
     helper_main(args[1], args[2])
     sys.exit(0)
-if not args or (len(args) == 1 and args[0].startswith("--open=")):
-    from benchwise.shell import main
-    main(open_tool=args[0].split("=", 1)[1] if args else None)
+from benchwise.launch import is_window_start  # noqa: E402
+
+if is_window_start(args):
+    from benchwise.launch import run_window
+    sys.exit(run_window(args))
 elif sys.stdout is None:
     # The window build has no console, so command-line output would vanish without a trace.
     import ctypes

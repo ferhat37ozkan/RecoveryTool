@@ -300,3 +300,34 @@ def badge(name, size, color):
             if a:
                 px[x, y] = (r, g, b, a)
     return img.resize((size, size), Image.LANCZOS)
+
+
+# -- temperature icons for the notification area --------------------------------------------------
+TEMP_COLORS = {"good": (34, 160, 100), "warning": (214, 140, 20), "bad": (210, 60, 60), "unknown": (90, 100, 125)}
+_FONTS = ("segoeuib.ttf", "arialbd.ttf")
+
+
+def _font(size):
+    from PIL import ImageFont
+    import os
+    for name in _FONTS:
+        path = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", name)
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
+
+
+def temp_icon(temp, level="good", size=32):
+    """The number of degrees on a rounded tile coloured by ``level`` ("?" when not reported)."""
+    big = size * _SS
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((0, 0, big - 1, big - 1), radius=big * 0.22, fill=TEMP_COLORS.get(level, TEMP_COLORS["unknown"]) + (255,))
+    text = "?" if temp is None else str(int(round(temp)))
+    fsize = int(big * (0.80 if len(text) <= 2 else 0.58))
+    font = _font(fsize)
+    box = d.textbbox((0, 0), text, font=font)
+    x = (big - (box[2] - box[0])) / 2 - box[0]
+    y = (big - (box[3] - box[1])) / 2 - box[1]
+    d.text((x, y), text, font=font, fill=(255, 255, 255, 255))
+    return img.resize((size, size), Image.LANCZOS)

@@ -213,6 +213,44 @@ i18n.STRINGS.update({
     "dh_raid_read_failed": ("The disks inside the array could not be read ({err}).",
                             "Dizinin içindeki diskler okunamadı ({err})."),
 
+    # --- next to the clock / live monitoring ---
+    "dh_tray": ("By the clock", "Saatin yanında"),
+    "tray_open": ("Open Benchwise", "Benchwise'ı aç"),
+    "tray_quit": ("Quit", "Çıkış"),
+    "tray_health": ("Health: {level} · click to open", "Sağlık: {level} · açmak için tıklayın"),
+    "tray_hidden_title": ("Benchwise keeps watching", "Benchwise izlemeye devam ediyor"),
+    "tray_hidden_body": ("The disk temperatures stay next to the clock. Click one to open Benchwise; right-click "
+                         "it to quit.", "Disk sıcaklıkları saatin yanında kalıyor. Benchwise'ı açmak için birine "
+                         "tıklayın; kapatmak için sağ tıklayın."),
+    "live_on": ("Live monitoring: on (always administrator)", "Canlı takip: açık (sürekli yönetici)"),
+    "live_off": ("Live monitoring: off", "Canlı takip: kapalı"),
+    "live_source_only": ("(only in Benchwise.exe)", "(yalnızca Benchwise.exe'de)"),
+    "live_autostart": ("Start with Windows (next to the clock)", "Windows açılışında başlat (saatin yanında)"),
+    "live_turn_on": ("Turn on live monitoring", "Canlı takibi aç"),
+    "live_turn_off": ("Turn off", "Kapat"),
+    "live_title": ("Live disk temperatures", "Canlı disk sıcaklıkları"),
+    "live_body": ("Windows gives disk temperatures only to programs running as administrator. To show them next "
+                  "to the clock all the time, Benchwise needs to always run as administrator.\n\n"
+                  "Allow this once: Windows Task Scheduler will start Benchwise with administrator rights without "
+                  "asking again, also when you open it yourself.",
+                  "Windows disk sıcaklıklarını yalnızca yönetici olarak çalışan programlara verir. Sıcaklıkları "
+                  "saatin yanında sürekli gösterebilmek için Benchwise'ın hep yönetici olarak çalışması gerekir.\n\n"
+                  "Buna bir kez izin verin: Windows Görev Zamanlayıcı, Benchwise'ı bundan sonra (siz açtığınızda da) "
+                  "tekrar sormadan yönetici olarak başlatır."),
+    "live_autostart_long": ("Start Benchwise when Windows starts - in the background, only next to the clock",
+                            "Windows açılınca Benchwise'ı başlat - arka planda, yalnızca saatin yanında"),
+    "live_note": ("You can turn this off any time here in Disk Health. Benchwise does not open its window at "
+                  "start; click a temperature next to the clock to bring it up.",
+                  "Bunu istediğiniz zaman Disk Sağlığı'ndan kapatabilirsiniz. Benchwise açılışta penceresini "
+                  "göstermez; açmak için saatin yanındaki bir sıcaklığa tıklayın."),
+    "live_allow": ("Allow", "İzin ver"),
+    "live_not_now": ("Not now", "Şimdilik hayır"),
+    "live_failed": ("Could not change the Windows task: {err}", "Windows görevi değiştirilemedi: {err}"),
+    "live_off_ask": ("Turn off live monitoring? Benchwise will no longer start with Windows and will ask for "
+                     "administrator rights again when a tool needs them.",
+                     "Canlı takip kapatılsın mı? Benchwise artık Windows ile başlamaz ve bir araç gerektirdiğinde "
+                     "yönetici yetkisini yeniden sorar."),
+
     # --- update notice ---
     "up_card_title": ("New version available", "Yeni sürüm var"),
     "up_card_sub": ("Benchwise {v} · click for details", "Benchwise {v} · ayrıntılar için tıklayın"),

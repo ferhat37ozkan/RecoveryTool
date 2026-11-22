@@ -98,8 +98,10 @@ class CardGrid(ctk.CTkScrollableFrame):
 
 
 class Shell(ctk.CTk):
-    def __init__(self, open_tool=None):
+    def __init__(self, open_tool=None, hidden=False):
         super().__init__(fg_color=BG)
+        if hidden:
+            self.withdraw()         # started at sign-in: only the icons next to the clock
         self.title("%s  v%s" % (APP_NAME, __version__))
         self.minsize(1000, 700)
         self.center(1180, 800)
@@ -112,7 +114,14 @@ class Shell(ctk.CTk):
         self.page = ("home",)       # ("home",) | ("category", cat) | ("tool", cat, tool)
         self.images = {}
         self.notice = None          # the "new version" card, once the check found one
+        self.tray = None            # icons next to the clock (benchwise.tray), while disks are chosen
+        self.monitor = None         # temperature readings for them (benchwise.monitor)
+        self.tray_version = -1
+        self.promoted = False
+        self.told_hidden = False
+        self.show_asked = []        # set from another thread when a second start asks to be shown
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.bind("<Destroy>", lambda e: self.stop_tray() if e.widget is self else None)
         self.build()
         self.after(2500, self.check_update)
         from . import selfupdate
@@ -123,6 +132,9 @@ class Shell(ctk.CTk):
             cat, tool = find_tool("disk.recovery")
         if tool is not None:
             self.after(10, lambda: self.open_tool(cat, tool))
+        from . import instance
+        instance.listen(lambda: self.show_asked.append(True))
+        self.after(600, self.tick_tray)
 
     def center(self, width, height):
         """Open in the middle of the screen, never larger than it.
@@ -327,7 +339,13 @@ class Shell(ctk.CTk):
             return
         if self.busy_views() and not messagebox.askyesno(APP_NAME, t("bw_admin_busy"), icon="warning"):
             return
-        if not elevate.restart_as_admin(tool.id):
+        from . import livemode
+        started = False
+        if livemode.supported() and livemode.enabled():
+            from . import instance
+            instance.release()
+            started = livemode.start_elevated(show=True, open_tool=tool.id)     # no UAC prompt
+        if not started and not elevate.restart_as_admin(tool.id):
             return messagebox.showinfo(APP_NAME, t("bw_admin_failed"))
         self.close_now()
 
@@ -342,21 +360,110 @@ class Shell(ctk.CTk):
                 view.relabel()
         self.build()
 
+    # -- next to the clock ----------------------------------------------------------------------
+    def tray_wanted(self):
+        from . import monitor
+        return bool(monitor.selected())
+
+    def tick_tray(self):
+        """Once a second: keep the icons in step with the chosen disks and the latest readings."""
+        from . import monitor, tray
+        if self.show_asked:
+            self.show_asked.clear()
+            self.show_window()
+        if self.tray_wanted():
+            if self.monitor is None:
+                self.monitor = monitor.Monitor()
+            if self.tray is None:
+                self.tray = tray.Tray((t("tray_open"), t("tray_quit")))
+            if self.monitor.version != self.tray_version:
+                self.tray_version = self.monitor.version
+                self.tray.set_icons(self.monitor.icons())
+                if not self.promoted and self.tray_version > 0:
+                    self.promoted = True
+                    self.after(1500, lambda: tray.promote_icons(_icon_exe()))
+            self.handle_tray_events()
+        elif self.tray is not None:
+            self.stop_tray()
+        if self.winfo_exists():
+            self.after(1000, self.tick_tray)
+
+    def handle_tray_events(self):
+        import queue as _q
+        while True:
+            try:
+                kind, key = self.tray.events.get_nowait()
+            except _q.Empty:
+                return
+            if kind == "quit":
+                return self.quit_app()
+            self.show_window()
+            if kind == "click" and key:
+                self.open_tool_id("disk.health")
+                view = self.views.get("disk.health")
+                if view is not None and hasattr(view, "select_key"):
+                    view.select_key(key)
+
+    def tray_changed(self):
+        """The chosen disks changed (Disk Health): read now instead of in up to 30 seconds."""
+        if self.monitor is not None:
+            self.monitor.refresh()
+        self.tray_version = -1
+
+    def stop_tray(self):
+        if self.tray is not None:
+            tray, self.tray = self.tray, None
+            tray.stop()
+        if self.monitor is not None:
+            self.monitor.stop()
+            self.monitor = None
+        self.promoted = False
+
+    def show_window(self):
+        self.deiconify()
+        self.state("normal")
+        self.lift()
+        self.attributes("-topmost", True)
+        self.after(300, lambda: self.attributes("-topmost", False))
+        self.focus_force()
+
+    def quit_app(self):
+        """Really close (the "Quit" of the tray menu, or the window's X when nothing is watched)."""
+        for view in list(self.views.values()):
+            if hasattr(view, "on_close") and not view.on_close():
+                self.show_window()
+                return              # that tool stops its work first, then closes the window itself
+        self.stop_tray()
+        self.destroy()
+
     def close_now(self):
         for view in self.views.values():
             if hasattr(view, "close_session"):
                 view.close_session()
+        self.stop_tray()
+        from . import instance
+        instance.release()          # the copy started next (update, restart as admin) takes over at once
         self.destroy()
 
     def on_close(self):
-        for view in list(self.views.values()):
-            if hasattr(view, "on_close") and not view.on_close():
-                return              # that tool stops its work first, then closes the window itself
-        self.destroy()
+        if self.tray is not None and self.tray_wanted():
+            self.withdraw()         # keep watching the temperatures next to the clock
+            if not self.told_hidden:
+                self.told_hidden = True
+                self.tray.notify(t("tray_hidden_title"), t("tray_hidden_body"))
+            return
+        self.quit_app()
 
 
-def main(open_tool=None):
+def _icon_exe():
+    """The program Windows files our notification icons under (for showing them next to the clock)."""
+    if getattr(sys, "frozen", False):
+        return os.path.abspath(sys.executable)
+    return getattr(sys, "_base_executable", sys.executable)
+
+
+def main(open_tool=None, hidden=False):
     forced = os.environ.get("RECOVERYTOOL_LANG")          # "en" or "tr" overrides the Windows language
     i18n.set_language(forced) if forced else i18n.detect()
     ctk.set_appearance_mode("dark")
-    Shell(open_tool).mainloop()
+    Shell(open_tool, hidden=hidden).mainloop()

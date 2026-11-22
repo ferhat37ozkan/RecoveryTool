@@ -22,7 +22,7 @@ def is_admin():
 
 def restart_as_admin(open_tool=None):
     """Start Benchwise elevated.  True when the elevated copy is running (the user said yes)."""
-    args = ["--open=" + open_tool] if open_tool else []
+    args = (["--open=" + open_tool] if open_tool else []) + ["--wait"]       # this copy is still closing
     if getattr(sys, "frozen", False):
         exe, params, cwd = sys.executable, subprocess.list2cmdline(args), None
     else:                       # from a source checkout: python -m benchwise, in the repository root

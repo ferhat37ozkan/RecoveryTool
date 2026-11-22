@@ -270,3 +270,24 @@ def member_disk(array, m):
     elif m.get("smart"):
         d["smart"] = parse_smart(m["smart"], m.get("thresholds"))
     return d
+
+
+def attach_members(disks):
+    """Insert the member disks of AMD RAID arrays right after their array (when the library is set up)."""
+    out = []
+    for d in disks:
+        out.append(d)
+        if is_amd_raid(d) and supported() and installed():
+            members, err = read_members()
+            if members:
+                d["members"] = [member_disk(d, m) for m in members]
+                out += d["members"]
+            else:
+                d["raid_error"] = err
+    return out
+
+
+def disk_key(d):
+    """A name for a disk that survives reboots and renumbering: its serial number when it has one."""
+    serial = (d.get("serial") or "").strip()
+    return "sn:" + serial if serial else "id:%s" % d["id"]

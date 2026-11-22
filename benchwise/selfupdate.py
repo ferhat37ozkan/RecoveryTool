@@ -109,7 +109,7 @@ def install(new_exe):
     except PermissionError:
         return _install_elevated(new_exe, exe)
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen([exe], cwd=folder, creationflags=flags, close_fds=True)
+    subprocess.Popen([exe, "--wait"], cwd=folder, creationflags=flags, close_fds=True)    # we still hold the lock
     return "done"
 
 
@@ -125,7 +125,7 @@ def _install_elevated(new_exe, exe):
                 "for ($i = 0; $i -lt 20; $i++) {\n"
                 "  try { Copy-Item -LiteralPath %s -Destination %s -Force; break } catch { Start-Sleep -Milliseconds 500 }\n"
                 "}\n"
-                "Start-Process -FilePath %s\n" % (os.getpid(), q(new_exe), q(exe), q(exe)))
+                "Start-Process -FilePath %s -ArgumentList '--wait'\n" % (os.getpid(), q(new_exe), q(exe), q(exe)))
     params = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%s"' % script
     if ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", params, None, 0) <= 32:
         raise RuntimeError("administrator rights are needed to replace Benchwise.exe in its folder")

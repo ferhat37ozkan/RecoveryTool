@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+Added
+
+- **Live disk temperatures next to the clock.** Tick "By the clock" on a disk in Disk Health and its
+  temperature appears in the notification area as its own icon (green / amber / red by the same limits
+  as the verdict), refreshed every 30 seconds. Hovering shows the model, degrees, which disk and link,
+  and health; a click opens Benchwise on that disk; right-click has Open and Quit. With disks watched,
+  closing the window keeps Benchwise running next to the clock. Windows 11 would hide new icons behind
+  the "^"; Benchwise shows its own there unless the user hid them on purpose.
+- **Live monitoring mode (always administrator).** Windows gives temperatures only to administrators.
+  With one consent a Task Scheduler task runs Benchwise elevated without further UAC prompts, also when
+  it is opened normally; optionally it starts with Windows in the background (no window, only the icons).
+  Can be switched off in Disk Health, which deletes the task.
+- **In-app update.** "Download and install" in the update panel downloads the release's Benchwise.exe
+  with a progress bar, checks its size and SHA-256 against the release, replaces the running exe and
+  restarts.
+- One Benchwise at a time: a second start brings the running window to the front.
+
 ## 1.1.0
 
 The app is now **Benchwise**, a workbench of tools. RecoveryTool lives on as its first tool,

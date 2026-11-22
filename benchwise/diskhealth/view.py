@@ -13,7 +13,7 @@ import customtkinter as ctk
 from recoverytool.i18n import t
 from recoverytool.model import human_size
 
-from .. import ui
+from .. import livemode, monitor, ui
 from ..ui import BG, BORDER, CARD, CARD_HOVER, LEVEL, MUTED, TEXT
 from . import amdraid, data, verdict
 
@@ -51,6 +51,7 @@ class DiskHealthView(ctk.CTkFrame):
         super().__init__(master, fg_color=BG)
         self.disks, self.results, self.selected, self.loading, self.error = [], {}, None, False, None
         self.dl = None              # (step, done, total) while AMD_RC2t7 is being downloaded
+        self.pending_key = None     # a disk to select once the list is in (a click on its clock icon)
         self.events = queue.Queue()
         style = ttk.Style(self)
         style.configure("Health.Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT, rowheight=26,
@@ -83,18 +84,7 @@ class DiskHealthView(ctk.CTkFrame):
 
     @staticmethod
     def with_members(disks):
-        """Insert the member disks of AMD RAID arrays right after their array (when the library is set up)."""
-        out = []
-        for d in disks:
-            out.append(d)
-            if amdraid.is_amd_raid(d) and amdraid.supported() and amdraid.installed():
-                members, err = amdraid.read_members()
-                if members:
-                    d["members"] = [amdraid.member_disk(d, m) for m in members]
-                    out += d["members"]
-                else:
-                    d["raid_error"] = err
-        return out
+        return amdraid.attach_members(disks)
 
     def get_library(self):
         if not messagebox.askyesno(t("dh_raid_title"), t("dh_raid_ask", v=amdraid.VERSION, url=amdraid.URL,
@@ -136,6 +126,10 @@ class DiskHealthView(ctk.CTkFrame):
                     self.results = {d["id"]: verdict.assess(d) for d in value}
                     if self.selected not in self.results:
                         self.selected = value[0]["id"] if value else None
+                    if self.pending_key:
+                        d = next((x for x in value if amdraid.disk_key(x) == self.pending_key), None)
+                        self.selected = d["id"] if d else self.selected
+                        self.pending_key = None
                     self.status.configure(text=" " if value else t("dh_none"))
                 else:
                     self.error = value
@@ -169,6 +163,9 @@ class DiskHealthView(ctk.CTkFrame):
         self.refresh_btn.pack(side="right")
         self.status = ctk.CTkLabel(head, text=" ", font=("Segoe UI", 11), text_color=MUTED)
         self.status.pack(side="right", padx=12)
+        self.live_row = ctk.CTkFrame(root, fg_color=BG)
+        self.live_row.pack(fill="x", pady=(0, 10))
+        self.render_live_row()
         body = ctk.CTkFrame(root, fg_color=BG)
         body.pack(fill="both", expand=True)
         self.listf = ctk.CTkScrollableFrame(body, fg_color=BG, width=LIST_WIDTH, scrollbar_button_color=BORDER)
@@ -182,6 +179,101 @@ class DiskHealthView(ctk.CTkFrame):
     def relabel(self):
         self.build()
         self.status.configure(text=t("dh_loading") if self.loading else " ")
+
+    # -- next to the clock ----------------------------------------------------------------------
+    def render_live_row(self):
+        row = self.live_row
+        for w in row.winfo_children():
+            w.destroy()
+        on = livemode.enabled()
+        ctk.CTkLabel(row, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
+                     text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
+        if not livemode.supported():
+            ctk.CTkLabel(row, text="  " + t("live_source_only"), font=("Segoe UI", 11), text_color=MUTED).pack(side="left")
+            return
+        if on:
+            self.autostart_var = tk.BooleanVar(value=livemode.autostart())
+            ctk.CTkCheckBox(row, text=t("live_autostart"), variable=self.autostart_var, command=self.toggle_autostart,
+                            font=("Segoe UI", 12), text_color=TEXT, checkbox_width=18, checkbox_height=18,
+                            border_width=2, fg_color=ui.ACCENT, border_color=MUTED).pack(side="left", padx=(16, 0))
+            ui.button(row, t("live_turn_off"), self.turn_live_off, 150).pack(side="left", padx=(12, 0))
+        else:
+            ui.button(row, t("live_turn_on"), lambda: self.ask_live(), 170).pack(side="left", padx=(12, 0))
+
+    def ask_live(self):
+        """One-time consent for the permanent administrator mode (and starting with Windows)."""
+        win = ctk.CTkToplevel(self, fg_color=BG)
+        win.title(t("live_title"))
+        win.resizable(False, False)
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+        ctk.CTkLabel(win, text=t("live_title"), font=("Segoe UI Semibold", 18), text_color=TEXT, anchor="w").pack(
+            fill="x", padx=22, pady=(18, 6))
+        ctk.CTkLabel(win, text=t("live_body"), font=("Segoe UI", 12), text_color=TEXT, anchor="w", justify="left",
+                     wraplength=520).pack(fill="x", padx=22)
+        auto = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(win, text=t("live_autostart_long"), variable=auto, font=("Segoe UI", 12), text_color=TEXT,
+                        checkbox_width=18, checkbox_height=18, border_width=2, fg_color=ui.ACCENT,
+                        border_color=MUTED).pack(fill="x", padx=22, pady=(14, 4))
+        ctk.CTkLabel(win, text=t("live_note"), font=("Segoe UI", 11), text_color=MUTED, anchor="w", justify="left",
+                     wraplength=520).pack(fill="x", padx=22)
+        row = ctk.CTkFrame(win, fg_color="transparent")
+        row.pack(fill="x", padx=22, pady=(16, 18))
+        result = {"ok": False}
+
+        def allow():
+            try:
+                livemode.enable(start_with_windows=auto.get())
+                result["ok"] = True
+            except Exception as ex:             # schtasks refused: say why, change nothing
+                messagebox.showerror(t("live_title"), t("live_failed", err=ex), parent=win)
+            win.destroy()
+        ui.button(row, t("live_allow"), allow, 150, primary=True).pack(side="left")
+        ui.button(row, t("live_not_now"), win.destroy, 140).pack(side="right")
+        win.update_idletasks()
+        top = self.winfo_toplevel()
+        win.geometry("+%d+%d" % (top.winfo_rootx() + (top.winfo_width() - win.winfo_width()) // 2,
+                                 top.winfo_rooty() + (top.winfo_height() - win.winfo_height()) // 3))
+        self.wait_window(win)
+        self.render_live_row()
+        return result["ok"]
+
+    def toggle_autostart(self):
+        try:
+            livemode.enable(start_with_windows=self.autostart_var.get())
+        except Exception as ex:
+            messagebox.showerror(t("live_title"), t("live_failed", err=ex))
+        self.render_live_row()
+
+    def turn_live_off(self):
+        if not messagebox.askyesno(t("live_title"), t("live_off_ask")):
+            return
+        try:
+            livemode.disable()
+        except Exception as ex:
+            messagebox.showerror(t("live_title"), t("live_failed", err=ex))
+        self.render_live_row()
+
+    def toggle_tray(self, key, var):
+        keys = monitor.selected()
+        if var.get():
+            if not keys and livemode.supported() and not livemode.enabled():
+                self.ask_live()                 # first disk: offer the permanent mode once (optional)
+            keys.append(key)
+        else:
+            keys = [k for k in keys if k != key]
+        monitor.set_selected(keys)
+        shell = self.winfo_toplevel()
+        if hasattr(shell, "tray_changed"):
+            shell.tray_changed()
+
+    def select_key(self, key):
+        """Select the disk a clock icon stands for (now, or once the list has been read)."""
+        d = next((x for x in self.disks if amdraid.disk_key(x) == key), None)
+        if d is None:
+            self.pending_key = key
+            return
+        self.select(d["id"])
 
     def render(self):
         for w in self.listf.winfo_children():
@@ -213,6 +305,18 @@ class DiskHealthView(ctk.CTkFrame):
         self.items[d["id"]] = item
         stripe = ctk.CTkFrame(item, fg_color=color, width=5, height=10, corner_radius=3)
         stripe.pack(side="left", fill="y", padx=(8, 0), pady=10)
+        key = amdraid.disk_key(d)
+        var = tk.BooleanVar(value=key in monitor.selected())
+        side = ctk.CTkFrame(item, fg_color="transparent", width=64)
+        side.pack(side="right", fill="y", padx=(0, 8), pady=8)
+        temp = res["figures"].get("temperature")
+        ctk.CTkLabel(side, text="%d °C" % temp if temp is not None else "– °C", font=("Segoe UI Semibold", 12),
+                     text_color=LEVEL[monitor.temp_level(d, temp)] if temp is not None else MUTED).pack()
+        ctk.CTkCheckBox(side, text="", variable=var, width=24, checkbox_width=18, checkbox_height=18, border_width=2,
+                        fg_color=ui.ACCENT, border_color=MUTED,
+                        command=lambda k=key, v=var: self.toggle_tray(k, v)).pack(pady=(2, 0))
+        ctk.CTkLabel(side, text=t("dh_tray"), font=("Segoe UI", 9), text_color=MUTED, justify="center",
+                     wraplength=64).pack()
         box = ctk.CTkFrame(item, fg_color="transparent")
         box.pack(side="left", fill="both", expand=True, padx=10, pady=8)
         ctk.CTkLabel(box, text=d["name"] or "Disk %d" % d["number"], font=("Segoe UI Semibold", 13), text_color=TEXT,
