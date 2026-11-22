@@ -73,7 +73,7 @@ CATEGORIES = [
     ]),
     Category("system", "chip", [
         Tool("system.sysinfo", "info", view=_tool("sysinfo")),
-        Tool("system.memtest", "memory", admin=True),
+        Tool("system.memtest", "memory", admin=True, view=_tool("memtest")),
         Tool("system.crash", "bolt", admin=True),
         Tool("system.stress", "flame"),
     ]),
