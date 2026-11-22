@@ -101,7 +101,7 @@ CATEGORIES = [
         Tool("windows.startup", "rocket", view=_tool("startup")),
     ]),
     Category("cleanup", "broom", [
-        Tool("cleanup.junk", "broom"),
+        Tool("cleanup.junk", "broom", view=_tool("junk")),
         Tool("cleanup.dupes", "copy"),
         Tool("cleanup.wipefree", "shred", admin=True),
         Tool("cleanup.space", "pie"),
