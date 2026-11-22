@@ -72,7 +72,7 @@ CATEGORIES = [
         Tool("disk.speed", "gauge", admin=True),
     ]),
     Category("system", "chip", [
-        Tool("system.sysinfo", "info"),
+        Tool("system.sysinfo", "info", view=_tool("sysinfo")),
         Tool("system.memtest", "memory", admin=True),
         Tool("system.crash", "bolt", admin=True),
         Tool("system.stress", "flame"),
