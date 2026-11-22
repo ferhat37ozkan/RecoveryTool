@@ -17,6 +17,7 @@ if (-not (Test-Path assets\icon.ico)) { & .\.venv\Scripts\python.exe tools\make_
     --icon assets\icon.ico `
     --add-data "assets\icon.ico;assets" `
     --collect-data customtkinter `
+    --collect-submodules benchwise.tools `
     --version-file tools\version_info.txt
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for Benchwise.exe (is Benchwise still running?)" }
 

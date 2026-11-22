@@ -46,6 +46,15 @@ def _recovery(master):
     return RecoveryView(master)
 
 
+def _tool(module):
+    """A tool in benchwise.tools.<module> (its View class), imported when opened.  The build collects
+    every module of benchwise.tools (build.ps1: --collect-submodules), so the import works in the exe."""
+    def make(master):
+        import importlib
+        return importlib.import_module("benchwise.tools." + module).View(master)
+    return make
+
+
 def _health(master):
     from .diskhealth.view import DiskHealthView
     return DiskHealthView(master)
@@ -73,7 +82,7 @@ CATEGORIES = [
         Tool("power.wake", "moon", admin=True),
     ]),
     Category("display", "monitor", [
-        Tool("display.pixels", "pixels"),
+        Tool("display.pixels", "pixels", view=_tool("pixels")),
         Tool("display.keyboard", "keyboard"),
         Tool("display.mouse", "mouse"),
         Tool("display.audio", "speaker"),
