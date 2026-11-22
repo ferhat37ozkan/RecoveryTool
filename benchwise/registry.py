@@ -78,7 +78,7 @@ CATEGORIES = [
         Tool("system.stress", "flame", view=_tool("stress")),
     ]),
     Category("power", "battery", [
-        Tool("power.battery", "battery"),
+        Tool("power.battery", "battery", view=_tool("battery")),
         Tool("power.wake", "moon", admin=True),
     ]),
     Category("display", "monitor", [
