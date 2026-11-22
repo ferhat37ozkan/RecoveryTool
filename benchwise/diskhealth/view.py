@@ -86,9 +86,10 @@ class DiskHealthView(ctk.CTkFrame):
     def with_members(disks):
         return amdraid.attach_members(disks)
 
-    def get_library(self):
-        if not messagebox.askyesno(t("dh_raid_title"), t("dh_raid_ask", v=amdraid.VERSION, url=amdraid.URL,
-                                                         lic=amdraid.LICENSE_URL)):
+    def get_library(self, intro=None):
+        """Ask (``intro`` first, when given) and download AMD_RC2t7."""
+        text = t("dh_raid_ask", v=amdraid.VERSION, url=amdraid.URL, lic=amdraid.LICENSE_URL)
+        if not messagebox.askyesno(t("dh_raid_title"), (intro + "\n\n" + text) if intro else text):
             return
         self.loading = True
         self.refresh_btn.configure(state="disabled")
@@ -256,6 +257,17 @@ class DiskHealthView(ctk.CTkFrame):
 
     def toggle_tray(self, key, var):
         keys = monitor.selected()
+        d = next((x for x in self.disks if amdraid.disk_key(x) == key), None)
+        if var.get() and d is not None and amdraid.is_amd_raid(d) and not d.get("members"):
+            # the array itself reports no temperature: its disks can be watched once AMD_RC2t7 is set up
+            var.set(False)
+            if amdraid.supported() and not amdraid.installed():
+                self.select(d["id"])
+                self.get_library(intro=t("dh_tray_raid_need"))
+            else:
+                messagebox.showinfo(t("dh_raid_title"), t("dh_tray_raid_source") if not amdraid.supported()
+                                    else t("dh_tray_raid_members"))
+            return
         if var.get():
             if not keys and livemode.supported() and not livemode.enabled():
                 self.ask_live()                 # first disk: offer the permanent mode once (optional)

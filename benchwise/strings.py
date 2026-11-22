@@ -215,6 +215,14 @@ i18n.STRINGS.update({
 
     # --- next to the clock / live monitoring ---
     "dh_tray": ("By the clock", "Saatin yanında"),
+    "dh_tray_raid_need": ("This RAID array reports no temperature itself. To watch the disks inside it next to "
+                          "the clock, AMD_RC2t7 has to be set up first; then tick those disks one by one.",
+                          "Bu RAID dizisi kendi sıcaklığını bildirmez. İçindeki diskleri saatin yanında izlemek için "
+                          "önce AMD_RC2t7 kurulmalı; ardından o diskleri tek tek işaretleyin."),
+    "dh_tray_raid_members": ("The array itself reports no temperature. Tick the disks listed under it instead.",
+                             "Dizinin kendisi sıcaklık bildirmez. Bunun yerine altında listelenen diskleri işaretleyin."),
+    "dh_tray_raid_source": ("The disks inside an AMD RAID array can only be read by Benchwise.exe.",
+                            "AMD RAID dizisinin içindeki diskler yalnızca Benchwise.exe ile okunabilir."),
     "tray_open": ("Open Benchwise", "Benchwise'ı aç"),
     "tray_quit": ("Quit", "Çıkış"),
     "tray_health": ("Health: {level} · click to open", "Sağlık: {level} · açmak için tıklayın"),
