@@ -82,8 +82,10 @@ def check(timeout=8):
     tag = rel.get("tag_name") or ""
     if rel.get("draft") or rel.get("prerelease") or not newer(tag):
         return None
-    exe = next((a["browser_download_url"] for a in rel.get("assets") or ()
-                if a.get("name", "").lower() == "benchwise.exe"), None)
+    assets = [a for a in rel.get("assets") or () if a.get("name", "").lower().endswith(".exe")]
+    named = [a for a in assets if a["name"].lower() == "benchwise.exe"]
+    other = [a for a in assets if "-cli" not in a["name"].lower()]         # uploaded under another name
+    exe = (named or other or [{}])[0].get("browser_download_url")
     return {"version": tag.lstrip("vV"), "name": rel.get("name") or tag, "notes": (rel.get("body") or "").strip(),
             "page": rel.get("html_url") or "https://github.com/%s/releases" % REPO, "exe": exe,
             "date": (rel.get("published_at") or "")[:10]}
