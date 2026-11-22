@@ -86,7 +86,7 @@ CATEGORIES = [
         Tool("display.keyboard", "keyboard", view=_tool("keyboard")),
         Tool("display.mouse", "mouse", view=_tool("mouse")),
         Tool("display.audio", "speaker", view=_tool("audio")),
-        Tool("display.camera", "camera"),
+        Tool("display.camera", "camera", view=_tool("camera")),
     ]),
     Category("network", "globe", [
         Tool("network.netdiag", "route"),
