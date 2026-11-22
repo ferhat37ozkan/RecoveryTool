@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.2.1
+
+Added
+
+- Benchwise's own icon next to the clock, first of the temperature icons: a click opens the main
+  screen (unless a tool is busy), right-click has Open and Quit.
+
+Fixed
+
+- "Failed to remove temporary directory" on closing: copies Benchwise starts of itself (the AMD RAID
+  helper, the elevated restart, the restart after an update) now unpack into their own folder instead
+  of sharing and holding the running copy's.
+
 ## 1.2.0
 
 Added
