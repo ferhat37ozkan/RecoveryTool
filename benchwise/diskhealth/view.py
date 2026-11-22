@@ -193,6 +193,7 @@ class DiskHealthView(ctk.CTkFrame):
         seg.set(t("live_seconds", n=monitor.interval()))
         seg.pack(side="right")                  # packed from the right: the buttons, then their label
         ctk.CTkLabel(row, text=t("live_interval"), font=("Segoe UI", 12), text_color=MUTED).pack(side="right", padx=(0, 8))
+        ui.button(row, t("tc_button"), self.open_colors, 130).pack(side="right", padx=(0, 16))
         ctk.CTkLabel(row, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
                      text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
         if not livemode.supported():
@@ -244,6 +245,69 @@ class DiskHealthView(ctk.CTkFrame):
         self.wait_window(win)
         self.render_live_row()
         return result["ok"]
+
+    def open_colors(self):
+        """Tile and digit colour of the clock icons, for each level (ideal / warm / risky)."""
+        from tkinter import colorchooser
+        from .. import art
+        win = ctk.CTkToplevel(self, fg_color=BG)
+        win.title(t("tc_title"))
+        win.resizable(False, False)
+        win.transient(self.winfo_toplevel())
+        ctk.CTkLabel(win, text=t("tc_title"), font=("Segoe UI Semibold", 18), text_color=TEXT, anchor="w").grid(
+            row=0, column=0, columnspan=4, sticky="w", padx=22, pady=(18, 2))
+        ctk.CTkLabel(win, text=t("tc_hint"), font=("Segoe UI", 11), text_color=MUTED, anchor="w", justify="left",
+                     wraplength=440).grid(row=1, column=0, columnspan=4, sticky="w", padx=22, pady=(0, 12))
+        samples = {"good": 38, "warning": 62, "bad": 74}
+        widgets = {}
+
+        def refresh():
+            palette = monitor.colors()
+            for level, (preview, bg_btn, fg_btn) in widgets.items():
+                img = art.temp_icon(samples[level], level, size=64, colors=palette)
+                preview.configure(image=ctk.CTkImage(light_image=img, dark_image=img, size=(40, 40)))
+                bg, fg = palette[level]
+                bg_btn.configure(fg_color=bg, hover_color=bg)
+                fg_btn.configure(fg_color=fg, hover_color=fg)
+            shell = self.winfo_toplevel()
+            if hasattr(shell, "tray_changed"):
+                shell.tray_changed()
+
+        def pick(level, part):
+            current = monitor.colors()[level][0 if part == "bg" else 1]
+            got = colorchooser.askcolor(color=current, parent=win, title=t("tc_" + level) + " - " + t("tc_" + part))
+            if got and got[1]:
+                monitor.set_color(level, part, got[1])
+                refresh()
+
+        for i, level in enumerate(monitor.LEVELS):
+            r = 2 + i
+            ctk.CTkLabel(win, text=t("tc_" + level), font=("Segoe UI Semibold", 13), text_color=TEXT, anchor="w",
+                         width=150).grid(row=r, column=0, sticky="w", padx=(22, 8), pady=6)
+            preview = ctk.CTkLabel(win, text="")
+            preview.grid(row=r, column=1, padx=8)
+            box = ctk.CTkFrame(win, fg_color="transparent")
+            box.grid(row=r, column=2, sticky="w", padx=(8, 22))
+            parts = []
+            for part in ("bg", "fg"):
+                cell = ctk.CTkFrame(box, fg_color="transparent")
+                cell.pack(side="left", padx=(0, 14))
+                swatch = ctk.CTkButton(cell, text="", width=34, height=26, corner_radius=6, border_width=1,
+                                       border_color=BORDER, command=lambda lv=level, p=part: pick(lv, p))
+                swatch.pack(side="left")
+                ctk.CTkLabel(cell, text=t("tc_" + part), font=("Segoe UI", 12), text_color=TEXT).pack(side="left", padx=(6, 0))
+                parts.append(swatch)
+            widgets[level] = (preview, parts[0], parts[1])
+        row = ctk.CTkFrame(win, fg_color="transparent")
+        row.grid(row=6, column=0, columnspan=4, sticky="ew", padx=22, pady=(14, 18))
+        ui.button(row, t("tc_reset"), lambda: (monitor.reset_colors(), refresh()), 160).pack(side="left")
+        ui.button(row, t("tc_close"), win.destroy, 110, primary=True).pack(side="right")
+        refresh()
+        win.update_idletasks()
+        top = self.winfo_toplevel()
+        win.geometry("+%d+%d" % (top.winfo_rootx() + (top.winfo_width() - win.winfo_width()) // 2,
+                                 top.winfo_rooty() + (top.winfo_height() - win.winfo_height()) // 3))
+        win.grab_set()
 
     def set_interval(self, label):
         for n in monitor.INTERVALS:

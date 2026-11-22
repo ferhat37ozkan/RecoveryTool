@@ -29,6 +29,31 @@ def interval():
     return value if value in INTERVALS else DEFAULT_INTERVAL
 
 
+LEVELS = ("good", "warning", "bad")
+
+
+def colors():
+    """{level: (tile, digits)} as the user chose them (Disk Health > icon colours); defaults otherwise."""
+    chosen = settings.get("tray_colors", {}) or {}
+    out = {}
+    for level, (bg, fg) in art.TEMP_COLORS.items():
+        c = chosen.get(level) or {}
+        out[level] = (c.get("bg") or bg, c.get("fg") or fg)
+    return out
+
+
+def set_color(level, part, value):
+    chosen = dict(settings.get("tray_colors", {}) or {})
+    entry = dict(chosen.get(level) or {})
+    entry[part] = value
+    chosen[level] = entry
+    settings.put("tray_colors", chosen)
+
+
+def reset_colors():
+    settings.put("tray_colors", {})
+
+
 def selected():
     return list(settings.get("tray_disks", []))
 
@@ -156,10 +181,12 @@ class Monitor:
     def icons(self):
         """Notification icons for the chosen disks, in the order they were chosen."""
         items = []
+        palette = colors()
         for key in selected():
             if key not in self.latest:
                 continue
             d, res, health = self.latest[key]
             temp = res["figures"].get("temperature")
-            items.append({"key": key, "image": art.temp_icon(temp, temp_level(d, temp)), "tip": tooltip(d, res, health)})
+            items.append({"key": key, "image": art.temp_icon(temp, temp_level(d, temp), colors=palette),
+                          "tip": tooltip(d, res, health)})
         return items

@@ -53,6 +53,17 @@ def test_icons():
         assert img.getpixel((16, 16))[3] == 255             # opaque tile behind the digits
 
 
+def test_custom_colours():
+    tile = art.temp_icon(40, "good", colors={"good": ("#1565c0", "#ffff00")})
+    from collections import Counter
+    tile_colour = Counter(p[:3] for p in tile.getdata() if p[3] == 255).most_common(1)[0][0]   # the tile
+    assert tile_colour == (0x15, 0x65, 0xC0), tile_colour
+    pixels = set(tile.getdata())
+    assert any(p[0] > 240 and p[1] > 240 and p[2] < 40 for p in pixels)     # yellow digits are drawn
+    broken = art.temp_icon(40, "good", colors={"good": ("not a colour", "#zz")})  # bad values: defaults
+    assert broken.size == (32, 32)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

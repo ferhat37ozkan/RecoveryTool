@@ -303,7 +303,17 @@ def badge(name, size, color):
 
 
 # -- temperature icons for the notification area --------------------------------------------------
-TEMP_COLORS = {"good": (34, 160, 100), "warning": (214, 140, 20), "bad": (210, 60, 60), "unknown": (90, 100, 125)}
+# default tile / digit colours of the clock icons: chosen for contrast on light and dark taskbars
+TEMP_COLORS = {"good": ("#17804a", "#ffffff"), "warning": ("#f0a020", "#111111"), "bad": ("#c62828", "#ffffff"),
+               "unknown": ("#5a647d", "#ffffff")}
+
+
+def _rgb(value, fallback):
+    try:
+        value = value.lstrip("#")
+        return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+    except (AttributeError, ValueError, IndexError):
+        return _rgb(fallback, "#808080") if fallback != value else (128, 128, 128)
 _FONTS = ("segoeuib.ttf", "arialbd.ttf")
 
 
@@ -317,17 +327,20 @@ def _font(size):
     return ImageFont.load_default()
 
 
-def temp_icon(temp, level="good", size=32):
-    """The number of degrees on a rounded tile coloured by ``level`` ("?" when not reported)."""
+def temp_icon(temp, level="good", size=32, colors=None):
+    """The number of degrees on a rounded tile coloured by ``level`` ("?" when not reported).
+    ``colors``: {level: (tile "#rrggbb", digits "#rrggbb")}, the user's choice; defaults otherwise."""
     big = size * _SS
     img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((0, 0, big - 1, big - 1), radius=big * 0.22, fill=TEMP_COLORS.get(level, TEMP_COLORS["unknown"]) + (255,))
+    default_bg, default_fg = TEMP_COLORS.get(level, TEMP_COLORS["unknown"])
+    bg, fg = (colors or {}).get(level, (default_bg, default_fg))
+    d.rounded_rectangle((0, 0, big - 1, big - 1), radius=big * 0.22, fill=_rgb(bg, default_bg) + (255,))
     text = "?" if temp is None else str(int(round(temp)))
     fsize = int(big * (0.80 if len(text) <= 2 else 0.58))
     font = _font(fsize)
     box = d.textbbox((0, 0), text, font=font)
     x = (big - (box[2] - box[0])) / 2 - box[0]
     y = (big - (box[3] - box[1])) / 2 - box[1]
-    d.text((x, y), text, font=font, fill=(255, 255, 255, 255))
+    d.text((x, y), text, font=font, fill=_rgb(fg, default_fg) + (255,))
     return img.resize((size, size), Image.LANCZOS)

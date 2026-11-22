@@ -26,6 +26,9 @@ Added
   they report and their spare blocks, hard disks from reallocated, pending and uncorrectable sectors;
   never higher than the verdict allows. An array shows its worst member.
 - Ticking an AMD RAID array for the clock ticks every disk inside it (unticking removes them all).
+- **Icon colours.** Disk Health > Icon colours: a background and a digit colour for each level (ideal,
+  warm, risky) with a live preview; applied next to the clock at once. Better-contrast defaults
+  (dark green / white, amber / black, red / white).
 - One Benchwise at a time: a second start brings the running window to the front.
 - Ticking a disk that reports no temperature (most USB enclosures) warns that it would show "?" and asks first.
 - Ticking an AMD RAID array for the clock first offers to set up AMD_RC2t7 (the array reports no
