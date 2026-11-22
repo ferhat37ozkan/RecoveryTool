@@ -115,6 +115,9 @@ class Shell(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.build()
         self.after(2500, self.check_update)
+        from . import selfupdate
+        selfupdate.cleanup()                        # what an earlier update left behind
+        self.after(8000, selfupdate.cleanup)        # the old exe may still have been closing
         cat, tool = find_tool(open_tool) if open_tool else (None, None)
         if os.environ.get("RECOVERYTOOL_SELFTEST") or os.environ.get("RECOVERYTOOL_UITEST"):
             cat, tool = find_tool("disk.recovery")

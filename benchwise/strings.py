@@ -225,6 +225,18 @@ i18n.STRINGS.update({
     "up_notes": ("What's new", "Yenilikler"),
     "up_no_notes": ("No release notes were published for this version.", "Bu sürüm için not yayımlanmamış."),
     "up_download": ("Download the update", "Güncellemeyi indir"),
+    "up_install": ("Download and install", "İndir ve yükle"),
+    "up_cancel": ("Cancel", "Vazgeç"),
+    "up_starting": ("Connecting to GitHub…", "GitHub'a bağlanılıyor…"),
+    "up_downloading": ("Downloading: {done} of {total}", "İndiriliyor: {done} / {total}"),
+    "up_installing": ("Checked (size and SHA-256 match the release). Installing…",
+                      "Doğrulandı (boyut ve SHA-256 sürümle aynı). Yükleniyor…"),
+    "up_restarting": ("Installed. Benchwise is restarting…", "Yüklendi. Benchwise yeniden başlatılıyor…"),
+    "up_failed": ("The update was not installed: {err}. Nothing was changed.",
+                  "Güncelleme yüklenmedi: {err}. Hiçbir şey değiştirilmedi."),
+    "up_busy": ("A tool is still working. Installing the update restarts Benchwise and stops it.\n\nContinue?",
+                "Bir araç hâlâ çalışıyor. Güncellemeyi yüklemek Benchwise'ı yeniden başlatır ve onu durdurur.\n\n"
+                "Devam edilsin mi?"),
     "up_page": ("Release page", "Sürüm sayfası"),
     "up_later": ("Later", "Daha sonra"),
 

@@ -91,7 +91,9 @@ def check(timeout=8):
     assets = [a for a in rel.get("assets") or () if a.get("name", "").lower().endswith(".exe")]
     named = [a for a in assets if a["name"].lower() == "benchwise.exe"]
     other = [a for a in assets if "-cli" not in a["name"].lower()]         # uploaded under another name
-    exe = (named or other or [{}])[0].get("browser_download_url")
+    asset = (named or other or [{}])[0]
+    exe = asset.get("browser_download_url")
     return {"version": tag.lstrip("vV"), "name": rel.get("name") or tag, "notes": (rel.get("body") or "").strip(),
             "page": rel.get("html_url") or "https://github.com/%s/releases" % REPO, "exe": exe,
+            "size": asset.get("size"), "digest": asset.get("digest"),       # "sha256:<hex>", checked on install
             "date": (rel.get("published_at") or "")[:10]}
