@@ -219,6 +219,13 @@ i18n.STRINGS.update({
                           "the clock, AMD_RC2t7 has to be set up first; then tick those disks one by one.",
                           "Bu RAID dizisi kendi sıcaklığını bildirmez. İçindeki diskleri saatin yanında izlemek için "
                           "önce AMD_RC2t7 kurulmalı; ardından o diskleri tek tek işaretleyin."),
+    "dh_tray_no_temp_usb": ("This disk does not report its temperature: most USB enclosures do not pass it through "
+                            "(connected directly by SATA, the same disk usually does).",
+                            "Bu disk sıcaklığını bildirmiyor: USB kutularının çoğu bu bilgiyi geçirmez (aynı disk "
+                            "doğrudan SATA ile bağlanınca genellikle bildirir)."),
+    "dh_tray_no_temp": ("This disk does not report its temperature.", "Bu disk sıcaklığını bildirmiyor."),
+    "dh_tray_no_temp_ask": ("Next to the clock it would show \"?\". Add it anyway?",
+                            "Saatin yanında \"?\" olarak görünür. Yine de eklensin mi?"),
     "dh_tray_raid_members": ("The array itself reports no temperature. Tick the disks listed under it instead.",
                              "Dizinin kendisi sıcaklık bildirmez. Bunun yerine altında listelenen diskleri işaretleyin."),
     "dh_tray_raid_source": ("The disks inside an AMD RAID array can only be read by Benchwise.exe.",

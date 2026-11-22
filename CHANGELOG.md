@@ -18,6 +18,7 @@ Added
   with a progress bar, checks its size and SHA-256 against the release, replaces the running exe and
   restarts.
 - One Benchwise at a time: a second start brings the running window to the front.
+- Ticking a disk that reports no temperature (most USB enclosures) warns that it would show "?" and asks first.
 - Ticking an AMD RAID array for the clock first offers to set up AMD_RC2t7 (the array reports no
   temperature itself); the disks inside it are then ticked one by one.
 

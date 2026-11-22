@@ -100,8 +100,11 @@ class CardGrid(ctk.CTkScrollableFrame):
 class Shell(ctk.CTk):
     def __init__(self, open_tool=None, hidden=False):
         super().__init__(fg_color=BG)
-        if hidden:
-            self.withdraw()         # started at sign-in: only the icons next to the clock
+        # Hidden while the widgets are created and drawn (customtkinter draws every widget on its own
+        # canvas, which would show piece by piece); shown in one go at the end of __init__.
+        # Started at sign-in (hidden=True) it stays hidden: only the icons next to the clock.
+        self.withdraw()
+        self.start_hidden = hidden
         self.title("%s  v%s" % (APP_NAME, __version__))
         self.minsize(1000, 700)
         self.center(1180, 800)
@@ -135,6 +138,25 @@ class Shell(ctk.CTk):
         from . import instance
         instance.listen(lambda: self.show_asked.append(True))
         self.after(600, self.tick_tray)
+        if not hidden:
+            self.update_idletasks()
+            self.after(30, self.reveal)
+
+    def reveal(self):
+        """Show the window once its first page is drawn.  customtkinter draws its widgets only after
+        the window is on screen, so it is mapped fully transparent first and made opaque when the
+        drawing is done - no half-drawn frames."""
+        self.attributes("-alpha", 0.0)
+        self.deiconify()
+        self.update_idletasks()
+        self.after(220, self.reveal_done)
+
+    def reveal_done(self):
+        self.attributes("-alpha", 1.0)
+        self.lift()                 # a window mapped transparent is not brought to the front by Windows
+        self.attributes("-topmost", True)
+        self.after(50, lambda: self.attributes("-topmost", False))
+        self.focus_force()
 
     def center(self, width, height):
         """Open in the middle of the screen, never larger than it.
@@ -218,13 +240,19 @@ class Shell(ctk.CTk):
         from .updatecard import UpdateNotice
         self.notice = UpdateNotice(self, info)
 
-    def prebuild(self):
-        """Build the category pages while the user looks at the home page, so they open at once."""
-        for cat in CATEGORIES:
-            if "cat:" + cat.id not in self.pages:
-                self.category_page(cat)
-                self.update_idletasks()
-        self.show(self.page)                # keep whatever is on screen in front
+    def prebuild(self, todo=None):
+        """Build the category pages while the user looks at the home page, so they open at once.
+
+        One page every 40 ms keeps the window responsive.  A new page is created on top of the
+        others in the shared cell, so it is sent to the back at once and never shows."""
+        if todo is None:
+            todo = [c for c in CATEGORIES if "cat:" + c.id not in self.pages]
+        if not todo or not self.winfo_exists():
+            return
+        cat = todo.pop(0)
+        if "cat:" + cat.id not in self.pages:
+            self.category_page(cat)
+        self.after(40, lambda: self.prebuild(todo))
 
     def crumb(self, text, command=None):
         ctk.CTkLabel(self.crumbs, text="›", font=("Segoe UI", 18), text_color=MUTED).pack(side="left", padx=8)
@@ -289,6 +317,8 @@ class Shell(ctk.CTk):
         if key in self.pages:
             return self.pages[key]
         page = self.pages[key] = self.place_page(ctk.CTkFrame(self.body, fg_color=BG))
+        if self.page[0] != "category" or self.page[1] is not cat:
+            page.lower()            # built in the background: behind the page on screen before it is filled
         ctk.CTkLabel(page, text=t(cat.key + "_d"), font=("Segoe UI", 13), text_color=MUTED, anchor="w").pack(
             fill="x", pady=(0, 4))
         if not self.admin and any(tool.admin for tool in cat.tools):

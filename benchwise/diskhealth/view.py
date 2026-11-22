@@ -268,6 +268,11 @@ class DiskHealthView(ctk.CTkFrame):
                 messagebox.showinfo(t("dh_raid_title"), t("dh_tray_raid_source") if not amdraid.supported()
                                     else t("dh_tray_raid_members"))
             return
+        if var.get() and d is not None and self.results.get(d["id"], {}).get("figures", {}).get("temperature") is None:
+            why = t("dh_tray_no_temp_usb") if d.get("bus") == "USB" else t("dh_tray_no_temp")
+            if not messagebox.askyesno(t("live_title"), why + "\n\n" + t("dh_tray_no_temp_ask")):
+                var.set(False)
+                return
         if var.get():
             if not keys and livemode.supported() and not livemode.enabled():
                 self.ask_live()                 # first disk: offer the permanent mode once (optional)
