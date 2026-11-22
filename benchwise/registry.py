@@ -83,8 +83,8 @@ CATEGORIES = [
     ]),
     Category("display", "monitor", [
         Tool("display.pixels", "pixels", view=_tool("pixels")),
-        Tool("display.keyboard", "keyboard"),
-        Tool("display.mouse", "mouse"),
+        Tool("display.keyboard", "keyboard", view=_tool("keyboard")),
+        Tool("display.mouse", "mouse", view=_tool("mouse")),
         Tool("display.audio", "speaker"),
         Tool("display.camera", "camera"),
     ]),
