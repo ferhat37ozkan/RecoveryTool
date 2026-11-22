@@ -144,12 +144,14 @@ def hicon_from_image(img):
 
 
 class Tray:
-    """Icons next to the clock.  ``events`` gets ("click", key), ("open", None) and ("quit", None)."""
+    """Icons next to the clock.  ``events`` gets ("click", key), ("open", None), ("passage", None)
+    and ("quit", None).  The Passage line shows only when ``passage`` is set: (label, checked)."""
 
-    MENU_OPEN, MENU_QUIT = 1, 2
+    MENU_OPEN, MENU_QUIT, MENU_PASSAGE = 1, 2, 3
 
     def __init__(self, labels=("Open", "Quit")):
         self.labels = labels
+        self.passage = None
         self.events = queue.Queue()
         self.requests = queue.Queue()
         self.icons = {}             # key -> (uID, HICON, tip)
@@ -220,6 +222,9 @@ class Tray:
     def _menu(self):
         menu = user32.CreatePopupMenu()
         user32.AppendMenuW(menu, 0, self.MENU_OPEN, self.labels[0])
+        if self.passage:
+            label, checked = self.passage
+            user32.AppendMenuW(menu, 0x8 if checked else 0, self.MENU_PASSAGE, label)    # MF_CHECKED
         user32.AppendMenuW(menu, 0x800, 0, None)                   # separator
         user32.AppendMenuW(menu, 0, self.MENU_QUIT, self.labels[1])
         pt = w.POINT()
@@ -231,6 +236,8 @@ class Tray:
             self.events.put(("open", None))
         elif cmd == self.MENU_QUIT:
             self.events.put(("quit", None))
+        elif cmd == self.MENU_PASSAGE:
+            self.events.put(("passage", None))
 
     def _run(self):
         taskbar_created = user32.RegisterWindowMessageW("TaskbarCreated")

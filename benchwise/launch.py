@@ -3,6 +3,7 @@
 Window flags:  --open=<tool id>  open a tool at once
                --task            started by the live-monitoring task (hidden unless a click asked)
                --wait            a copy that is just closing may still hold the single-instance lock
+               --tray            started at sign-in because Passage is on: hidden, only next to the clock
 """
 
 from __future__ import annotations
@@ -11,24 +12,26 @@ import sys
 
 
 def is_window_start(args):
-    return all(a.startswith("--open=") or a in ("--task", "--wait") for a in args)
+    return all(a.startswith("--open=") or a in ("--task", "--wait", "--tray") for a in args)
 
 
 def run_window(args):
     from . import elevate, instance, livemode
     open_tool = next((a.split("=", 1)[1] for a in args if a.startswith("--open=")), None)
     task = "--task" in args
-    if not instance.acquire(wait=8 if (task or "--wait" in args) else 0):
-        instance.signal_show()                  # Benchwise is already running: bring it to the front
-        return 0
-    hidden = False
+    hidden = "--tray" in args
     if task:
         show, wanted = livemode.take_show_flag()
         hidden = not show
         open_tool = open_tool or wanted
-        from . import monitor
-        if hidden and not monitor.selected():
-            return 0                            # started with Windows but no disk is watched: nothing to do
+    if not instance.acquire(wait=8 if (task or "--wait" in args) else 0):
+        if not hidden:
+            instance.signal_show()              # Benchwise is already running: bring it to the front
+        return 0                                # (two sign-in starts: the first one is enough)
+    if hidden:
+        from . import monitor, passage
+        if not monitor.selected() and not passage.is_on():
+            return 0                            # started with Windows but nothing to show next to the clock
     elif livemode.supported():
         cmd = livemode.task_command()                   # None: live mode is off
         if cmd is not None and elevate.is_admin():

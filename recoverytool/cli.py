@@ -153,6 +153,9 @@ def main(argv=None):
         i18n.set_language(argv[argv.index("--lang") + 1])
     else:
         i18n.detect()
+    if "--hideme" in argv:                      # Passage (Geçit): opens sites blocked in Turkey, in the background
+        from benchwise.passage_cli import cli_entry
+        return cli_entry(argv[argv.index("--hideme") + 1:])
     rest = [a for a in argv if a not in ("--lang", "en", "tr")]
     if not rest or any(a in ("help", "-h", "--help", "/?", "-?", "/h") for a in argv):
         print_help()

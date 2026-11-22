@@ -19,6 +19,9 @@ if len(args) in (3, 5) and args[0] == "--amdrc2-helper":     # Disk Health: read
     from benchwise.diskhealth.amdraid import helper_main
     helper_main(*args[1:])
     sys.exit(0)
+if args and (args[0].startswith("--passage=") or args[0] == "--hideme"):   # Passage, no window
+    from benchwise.passage_cli import window_entry
+    sys.exit(window_entry(args))
 from benchwise.launch import is_window_start  # noqa: E402
 
 if is_window_start(args):

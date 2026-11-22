@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox
 
@@ -126,6 +127,9 @@ class Shell(ctk.CTk):
         self.promoted = False
         self.told_hidden = False
         self.app_icon_image = None
+        from . import passage
+        self.passage_on = passage.is_on()   # Passage (Geçit): sites blocked in Turkey
+        self.passage_busy = None            # time the running switch started, while it runs
         self.show_asked = []        # set from another thread when a second start asks to be shown
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.bind("<Destroy>", lambda e: self.stop_tray() if e.widget is self else None)
@@ -142,6 +146,7 @@ class Shell(ctk.CTk):
         from . import instance
         instance.listen(lambda: self.show_asked.append(True))
         self.after(600, self.tick_tray)
+        self.after(1500, self.passage_startup)
         if not hidden:
             self.update_idletasks()
             self.after(30, self.reveal)
@@ -212,6 +217,7 @@ class Shell(ctk.CTk):
                             font=("Segoe UI Semibold", 11), text_color=GOOD if self.admin else MUTED,
                             fg_color=CARD, corner_radius=8, height=28, padx=10)
         mode.pack(side="right", padx=(0, 8))
+        self.build_passage(bar)
         # Every page and tool view sits in the same cell of the body and stays there; switching only
         # raises one above the others.  Nothing is unmapped and re-laid out, so there is no flicker.
         self.body = ctk.CTkFrame(self, fg_color=BG)
@@ -383,6 +389,81 @@ class Shell(ctk.CTk):
             return messagebox.showinfo(APP_NAME, t("bw_admin_failed"))
         self.close_now()
 
+    # -- Passage (Geçit) --------------------------------------------------------------------------
+    def build_passage(self, bar):
+        """Top right: the Passage switch.  The name opens a short explanation."""
+        pill = ctk.CTkFrame(bar, fg_color=CARD, corner_radius=8, border_width=1, border_color=BORDER, height=28)
+        pill.pack(side="right", padx=(0, 8))
+        name = ctk.CTkLabel(pill, text=t("ps_name"), font=("Segoe UI Semibold", 12), text_color=TEXT, cursor="hand2")
+        name.pack(side="left", padx=(12, 6))
+        name.bind("<Button-1>", lambda e: self.passage_info())
+        self.passage_status = ctk.CTkLabel(pill, text="", font=("Segoe UI", 11), text_color=MUTED)
+        self.passage_status.pack(side="left", padx=(0, 4))
+        self.passage_var = tk.BooleanVar(value=self.passage_on)
+        self.passage_switch = ctk.CTkSwitch(pill, text="", width=40, switch_width=36, switch_height=18,
+                                            variable=self.passage_var, progress_color=GOOD,
+                                            command=lambda: self.passage_toggle(self.passage_var.get()))
+        self.passage_switch.pack(side="left", padx=(0, 6))
+        self.passage_show()
+
+    def passage_show(self, text=None):
+        if not getattr(self, "passage_status", None) or not self.passage_status.winfo_exists():
+            return
+        self.passage_var.set(self.passage_on)
+        if self.passage_busy:
+            self.passage_status.configure(text=text or t("ps_busy"), text_color=WARN)
+            self.passage_switch.configure(state="disabled")
+        else:
+            self.passage_status.configure(text=t("ps_on" if self.passage_on else "ps_off"),
+                                          text_color=GOOD if self.passage_on else MUTED)
+            self.passage_switch.configure(state="normal")
+
+    def passage_startup(self):
+        """Keep the sign-in entry pointing at this exe, and an enabled engine running."""
+        from . import passage, passage_cli
+        if not self.passage_on:
+            return
+        passage_cli.set_autostart(True)
+        if self.admin:
+            threading.Thread(target=lambda: _quiet(passage.ensure_running), daemon=True).start()
+
+    def passage_toggle(self, want):
+        from . import passage, passage_cli
+        if self.passage_busy or want == self.passage_on:
+            return self.passage_show()
+        self.passage_busy = time.time()
+        self.passage_show()
+        if self.admin:
+            threading.Thread(target=lambda: _quiet(passage.enable if want else passage.disable),
+                             daemon=True).start()
+        elif not passage_cli.start_elevated(want):          # the UAC prompt was declined
+            self.passage_busy = None
+            return self.passage_show()
+        self.after(400, self.passage_poll)
+
+    def passage_poll(self):
+        from . import passage, passage_cli
+        prog = passage.read_progress() or {}
+        fresh = prog.get("time", 0) >= self.passage_busy - 1
+        if fresh and prog.get("done"):
+            self.passage_busy = None
+            self.passage_on = passage.is_on()
+            passage_cli.set_autostart(self.passage_on)
+            self.tray_version = -1
+            self.passage_show()
+            (messagebox.showinfo if prog.get("ok") else messagebox.showwarning)(t("ps_name"), prog.get("text", ""))
+            return
+        if time.time() - self.passage_busy > 600:         # the elevated step never reported back
+            self.passage_busy = None
+            self.passage_on = passage.is_on()
+            return self.passage_show()
+        self.passage_show(prog.get("text") if fresh else None)
+        self.after(400, self.passage_poll)
+
+    def passage_info(self):
+        from . import passage
+        messagebox.showinfo(t("ps_name"), t("ps_info") + "\n\n" + t("ps_now", state=passage.summary()))
+
     # -- language and closing -------------------------------------------------------------------
     def switch_language(self):
         if self.busy_views():
@@ -397,7 +478,7 @@ class Shell(ctk.CTk):
     # -- next to the clock ----------------------------------------------------------------------
     def tray_wanted(self):
         from . import monitor
-        return bool(monitor.selected())
+        return bool(monitor.selected()) or self.passage_on
 
     def tick_tray(self):
         """Once a second: keep the icons in step with the chosen disks and the latest readings."""
@@ -410,6 +491,10 @@ class Shell(ctk.CTk):
                 self.monitor = monitor.Monitor()
             if self.tray is None:
                 self.tray = tray.Tray((t("tray_open"), t("tray_quit")))
+            passage_menu = (t("ps_tray", state=t("ps_on" if self.passage_on else "ps_off")), self.passage_on)
+            if self.tray.passage != passage_menu:
+                self.tray.passage = passage_menu
+                self.tray_version = -1
             if self.monitor.version != self.tray_version:
                 self.tray_version = self.monitor.version
                 self.tray.set_icons([self.app_tray_icon()] + self.monitor.icons())
@@ -431,6 +516,9 @@ class Shell(ctk.CTk):
                 return
             if kind == "quit":
                 return self.quit_app()
+            if kind == "passage":
+                self.passage_toggle(not self.passage_on)
+                continue
             self.show_window()
             if kind == "click" and key == APP_TRAY_KEY:
                 if not self.busy_views():
@@ -450,7 +538,8 @@ class Shell(ctk.CTk):
                     self.app_icon_image = ico.convert("RGBA").resize((32, 32), Image.LANCZOS)
             except OSError:
                 self.app_icon_image = Image.new("RGBA", (32, 32), ACCENT)
-        return {"key": APP_TRAY_KEY, "image": self.app_icon_image, "tip": t("tray_app_tip")}
+        tip = t("tray_app_tip") + "\n" + t("ps_tray", state=t("ps_on" if self.passage_on else "ps_off"))
+        return {"key": APP_TRAY_KEY, "image": self.app_icon_image, "tip": tip}
 
     def tray_changed(self):
         """The chosen disks changed (Disk Health): read now instead of in up to 30 seconds."""
@@ -501,6 +590,13 @@ class Shell(ctk.CTk):
                 self.tray.notify(t("tray_hidden_title"), t("tray_hidden_body"))
             return
         self.quit_app()
+
+
+def _quiet(fn):
+    try:
+        fn()
+    except Exception:
+        pass
 
 
 def _icon_exe():
