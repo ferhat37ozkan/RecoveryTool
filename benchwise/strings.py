@@ -133,9 +133,100 @@ i18n.STRINGS.update({
                          "same disk usually reports everything.",
                          "Çoğu USB kutusu sağlık bilgisini geçirmez. Aynı disk doğrudan (SATA ile) bağlanınca "
                          "genellikle her şeyi bildirir."),
+    "dh_r_no_data_amd_raid": ("This is an AMD RAID array: the driver hides the disks inside it from Windows. "
+                              "Benchwise can show each of them (see below).",
+                              "Bu bir AMD RAID dizisi: sürücü içindeki diskleri Windows'tan gizler. Benchwise her birini "
+                              "ayrı ayrı gösterebilir (aşağıya bakın)."),
     "dh_r_no_data_raid": ("This is a RAID array. The controller hides the disks inside it; its own software shows "
                           "their health.", "Bu bir RAID dizisi. Denetleyici içindeki diskleri gizler; sağlıklarını "
                           "denetleyicinin kendi yazılımı gösterir."),
+
+    "dh_r_nvme_spare_low": ("The SSD has used up its spare blocks (at or below the safe minimum). It may turn "
+                            "read-only or fail. Back it up now.",
+                            "SSD yedek bloklarını tüketmiş (güvenli alt sınırda veya altında). Salt okunur hale "
+                            "gelebilir ya da arızalanabilir. Hemen yedekleyin."),
+    "dh_r_nvme_temp_warn": ("The SSD reports that its temperature is out of its safe range.",
+                            "SSD sıcaklığının güvenli aralığın dışına çıktığını bildiriyor."),
+    "dh_r_nvme_degraded": ("The SSD reports that its reliability is degraded by media or internal errors.",
+                           "SSD, ortam veya iç hatalar yüzünden güvenilirliğinin düştüğünü bildiriyor."),
+    "dh_r_nvme_readonly": ("The SSD has switched itself to read-only to protect your data. Copy it off now.",
+                           "SSD verilerinizi korumak için kendini salt okunur moda almış. Verileri hemen kopyalayın."),
+    "dh_r_nvme_backup_failed": ("The SSD's power-loss protection has failed.",
+                                "SSD'nin elektrik kesintisi koruması arızalanmış."),
+    "dh_r_nvme_media_errors": ("{n} data integrity errors that the SSD could not correct.",
+                               "SSD'nin düzeltemediği {n} veri bütünlüğü hatası var."),
+    "dh_r_nvme_overheated": ("The SSD spent {n} minutes above its critical temperature.",
+                             "SSD {n} dakika kritik sıcaklığının üstünde çalışmış."),
+    "dh_r_nvme_unsafe": ("{n} of {of} shutdowns were unexpected (power cut, forced power-off). Each one is a small "
+                         "risk for data being written at that moment.",
+                         "{of} kapanışın {n} tanesi beklenmedik (elektrik kesintisi, zorla kapatma). Her biri o "
+                         "anda yazılan veri için küçük bir risktir."),
+    "dh_r_raid_members": ("This is a RAID array of {n} disks; each is listed separately below it.",
+                          "Bu, {n} diskten oluşan bir RAID dizisi; her disk altında ayrıca listeleniyor."),
+    "dh_r_raid_member_bad": ("Disk {n} in the array ({name}) is at risk.", "Dizideki {n}. disk ({name}) riskli."),
+    "dh_r_raid_member_warning": ("Disk {n} in the array ({name}) needs watching.",
+                                 "Dizideki {n}. disk ({name}) dikkat gerektiriyor."),
+    "dh_t_spare": ("Spare blocks left", "Kalan yedek alan"),
+    "dh_t_written": ("Data written", "Yazılan veri"),
+    "dh_t_media": ("Media errors", "Medya hatası"),
+    "dh_t_unsafe": ("Unexpected shutdowns", "Beklenmedik kapanma"),
+    "dh_member_of": ("in Disk {n} · member {i}", "Disk {n} içinde · {i}. üye"),
+    "dh_link": ("Link", "Bağlantı hızı"),
+    "dh_used_by": ("Read through AMD_RC2t7 {v}, a third-party library by {by} ({site}). It is not part of Benchwise "
+                   "and Benchwise is not responsible for it.",
+                   "{by} tarafından geliştirilen üçüncü taraf kütüphane AMD_RC2t7 {v} ile okundu ({site}). Benchwise'ın "
+                   "parçası değildir; Benchwise bu kütüphaneden sorumlu değildir."),
+    "dh_raid_disclaimer": ("AMD_RC2t7 is not part of Benchwise. It is developed by {by} and downloaded from its official "
+                           "site ({site}); its use is governed by its own license. Benchwise does not distribute or "
+                           "modify it and is not responsible for it.",
+                           "AMD_RC2t7, Benchwise'ın parçası değildir. {by} tarafından geliştirilir ve resmi sitesinden "
+                           "({site}) indirilir; kullanımı kendi lisansına tabidir. Benchwise bu kütüphaneyi dağıtmaz, "
+                           "değiştirmez ve ondan sorumlu değildir."),
+    "dh_dl_download": ("Downloading from the official site: {done} of {total}", "Resmi siteden indiriliyor: {done} / {total}"),
+    "dh_dl_verify": ("Checking the fingerprint (SHA-256)…", "Parmak izi (SHA-256) kontrol ediliyor…"),
+    "dh_dl_signature": ("Checking the author's digital signature…", "Yazarın dijital imzası kontrol ediliyor…"),
+    "dh_dl_install": ("Installing next to Benchwise…", "Benchwise'ın yanına kuruluyor…"),
+    "dh_raid_title": ("Disks inside this RAID array", "Bu RAID dizisinin içindeki diskler"),
+    "dh_raid_body": ("The AMD RAID driver hides the real disks from Windows. Benchwise can read each disk's health "
+                     "(temperature, wear, errors) with AMD_RC2t7, a free library by Gakuto Matsumura that "
+                     "CrystalDiskInfo also uses. It is downloaded once from its official site (about 200 KB), "
+                     "checked against a fixed fingerprint and digital signature, and only reads.",
+                     "AMD RAID sürücüsü gerçek diskleri Windows'tan gizler. Benchwise her diskin sağlığını (sıcaklık, "
+                     "yıpranma, hatalar) Gakuto Matsumura'nın ücretsiz AMD_RC2t7 kütüphanesiyle okuyabilir; "
+                     "CrystalDiskInfo da aynı kütüphaneyi kullanır. Kütüphane resmi sitesinden bir kez indirilir "
+                     "(yaklaşık 200 KB), sabit parmak izi ve dijital imzayla doğrulanır ve yalnızca okuma yapar."),
+    "dh_raid_get": ("Download and show the disks", "İndir ve diskleri göster"),
+    "dh_raid_license": ("License", "Lisans"),
+    "dh_raid_source_only": ("This works in Benchwise.exe only (the library must sit next to the running program).",
+                            "Bu yalnızca Benchwise.exe'de çalışır (kütüphane çalışan programın yanında olmalı)."),
+    "dh_raid_ask": ("Download AMD_RC2t7 {v} from its official site?\n\nSource: {url}\nDeveloper: Gakuto Matsumura\n"
+                    "License: {lic}\n\nIt is checked against a fixed SHA-256 fingerprint and the author's digital "
+                    "signature before it is used, and it only reads health data.\n\nThis library is not part of "
+                    "Benchwise. Benchwise does not distribute or modify it and is not responsible for it; its use is "
+                    "governed by its own license.",
+                    "AMD_RC2t7 {v} resmi sitesinden indirilsin mi?\n\nKaynak: {url}\nGeliştirici: Gakuto Matsumura\n"
+                    "Lisans: {lic}\n\nKullanılmadan önce sabit bir SHA-256 parmak iziyle ve yazarın dijital imzasıyla "
+                    "doğrulanır; yalnızca sağlık bilgisini okur.\n\nBu kütüphane Benchwise'ın parçası değildir. "
+                    "Benchwise onu dağıtmaz, değiştirmez ve ondan sorumlu değildir; kullanımı kendi lisansına tabidir."),
+    "dh_raid_downloading": ("Downloading and checking AMD_RC2t7…", "AMD_RC2t7 indiriliyor ve doğrulanıyor…"),
+    "dh_raid_failed": ("Could not set up AMD_RC2t7: {err}", "AMD_RC2t7 kurulamadı: {err}"),
+    "dh_raid_read_failed": ("The disks inside the array could not be read ({err}).",
+                            "Dizinin içindeki diskler okunamadı ({err})."),
+
+    # --- update notice ---
+    "up_card_title": ("New version available", "Yeni sürüm var"),
+    "up_card_sub": ("Benchwise {v} · click for details", "Benchwise {v} · ayrıntılar için tıklayın"),
+    "up_panel_title": ("Benchwise {v} is ready", "Benchwise {v} hazır"),
+    "up_panel_sub": ("You have {cur} · released {date}", "Sizdeki sürüm {cur} · yayın tarihi {date}"),
+    "up_recommend": ("We recommend updating: new versions bring fixes, safety improvements and new tools. "
+                     "Your saved scans and settings are kept.",
+                     "Güncellemenizi öneririz: yeni sürümler hata düzeltmeleri, güvenlik iyileştirmeleri ve yeni "
+                     "araçlar getirir. Kayıtlı taramalarınız ve ayarlarınız korunur."),
+    "up_notes": ("What's new", "Yenilikler"),
+    "up_no_notes": ("No release notes were published for this version.", "Bu sürüm için not yayımlanmamış."),
+    "up_download": ("Download the update", "Güncellemeyi indir"),
+    "up_page": ("Release page", "Sürüm sayfası"),
+    "up_later": ("Later", "Daha sonra"),
 
     # --- categories ---
     "cat_disk": ("Disk", "Disk"),

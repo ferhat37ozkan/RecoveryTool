@@ -1,51 +1,305 @@
 [
-  {"number": 0, "name": "Samsung SSD 980 PRO 1TB", "serial": "S5GXNX0T123456", "media": "SSD", "bus": "NVMe",
-   "spindle": 0, "firmware": "5B2QGXA7", "size": 1000204886016, "health": "Healthy", "status": "OK",
-   "temperature": 41, "temperature_max": 0, "wear": 6, "hours": 8123, "read_errors": 0, "write_errors": 0,
-   "read_errors_corrected": null, "write_errors_corrected": null, "start_stop": 1840, "load_unload": null,
-   "smart": null, "predict_failure": null, "system": true, "style": "GPT"},
-  {"number": 1, "name": "WDC WD20EZRZ-00Z5HB0", "serial": "WD-WCC4M1ABCDEF", "media": "HDD", "bus": "SATA",
-   "spindle": 5400, "firmware": "80.00A80", "size": 2000398934016, "health": "Healthy", "status": "OK",
-   "temperature": 38, "temperature_max": 0, "wear": 0, "hours": 31234, "read_errors": 0, "write_errors": 0,
-   "read_errors_corrected": null, "write_errors_corrected": null, "start_stop": 4021, "load_unload": 98211,
-   "predict_failure": false, "style": "GPT",
-   "smart": [
-     {"id": 1, "current": 200, "worst": 200, "threshold": 51, "raw": 0},
-     {"id": 3, "current": 172, "worst": 168, "threshold": 21, "raw": 4383},
-     {"id": 4, "current": 96, "worst": 96, "threshold": 0, "raw": 4021},
-     {"id": 5, "current": 200, "worst": 200, "threshold": 140, "raw": 24},
-     {"id": 7, "current": 200, "worst": 200, "threshold": 0, "raw": 0},
-     {"id": 9, "current": 58, "worst": 58, "threshold": 0, "raw": 31234},
-     {"id": 10, "current": 100, "worst": 100, "threshold": 0, "raw": 0},
-     {"id": 12, "current": 96, "worst": 96, "threshold": 0, "raw": 3987},
-     {"id": 192, "current": 200, "worst": 200, "threshold": 0, "raw": 112},
-     {"id": 193, "current": 168, "worst": 168, "threshold": 0, "raw": 98211},
-     {"id": 194, "current": 112, "worst": 99, "threshold": 0, "raw": 38},
-     {"id": 196, "current": 200, "worst": 200, "threshold": 0, "raw": 24},
-     {"id": 197, "current": 200, "worst": 200, "threshold": 0, "raw": 0},
-     {"id": 198, "current": 100, "worst": 253, "threshold": 0, "raw": 0},
-     {"id": 199, "current": 200, "worst": 200, "threshold": 0, "raw": 3},
-     {"id": 200, "current": 200, "worst": 200, "threshold": 0, "raw": 0}
-   ]},
-  {"number": 2, "name": "ST1000DM003-1CH162", "serial": "Z1D9ABCD", "media": "HDD", "bus": "SATA",
-   "spindle": 7200, "firmware": "CC47", "size": 1000204886016, "health": "Warning", "status": "OK",
-   "temperature": 47, "temperature_max": 0, "wear": 0, "hours": 45012, "read_errors": 0, "write_errors": 0,
-   "read_errors_corrected": null, "write_errors_corrected": null, "start_stop": 9120, "load_unload": null,
-   "predict_failure": false, "style": "MBR",
-   "smart": [
-     {"id": 1, "current": 104, "worst": 99, "threshold": 6, "raw": 6894123},
-     {"id": 5, "current": 88, "worst": 88, "threshold": 10, "raw": 312},
-     {"id": 9, "current": 49, "worst": 49, "threshold": 0, "raw": 45012},
-     {"id": 187, "current": 92, "worst": 92, "threshold": 0, "raw": 8},
-     {"id": 188, "current": 100, "worst": 99, "threshold": 0, "raw": 2},
-     {"id": 194, "current": 47, "worst": 55, "threshold": 0, "raw": 47},
-     {"id": 197, "current": 100, "worst": 100, "threshold": 0, "raw": 16},
-     {"id": 198, "current": 100, "worst": 100, "threshold": 0, "raw": 16},
-     {"id": 199, "current": 200, "worst": 200, "threshold": 0, "raw": 0}
-   ]},
-  {"number": 3, "name": "WD Elements 25A2 USB Device", "serial": "57584D31", "media": "", "bus": "USB",
-   "spindle": null, "firmware": "1021", "size": 4000752599040, "health": "Healthy", "status": "OK",
-   "temperature": 0, "temperature_max": 0, "wear": 0, "hours": null, "read_errors": null, "write_errors": null,
-   "read_errors_corrected": null, "write_errors_corrected": null, "start_stop": null, "load_unload": null,
-   "smart": null, "predict_failure": null, "style": "GPT"}
+ {
+  "number": 0,
+  "name": "Samsung SSD 980 PRO 1TB",
+  "serial": "S5GXNX0T123456",
+  "media": "SSD",
+  "bus": "NVMe",
+  "spindle": 0,
+  "firmware": "5B2QGXA7",
+  "size": 1000204886016,
+  "health": "Healthy",
+  "status": "OK",
+  "temperature": 41,
+  "temperature_max": 0,
+  "wear": 6,
+  "hours": 8123,
+  "read_errors": 0,
+  "write_errors": 0,
+  "read_errors_corrected": null,
+  "write_errors_corrected": null,
+  "start_stop": 1840,
+  "load_unload": null,
+  "smart": null,
+  "predict_failure": null,
+  "system": true,
+  "style": "GPT"
+ },
+ {
+  "number": 1,
+  "name": "WDC WD20EZRZ-00Z5HB0",
+  "serial": "WD-WCC4M1ABCDEF",
+  "media": "HDD",
+  "bus": "SATA",
+  "spindle": 5400,
+  "firmware": "80.00A80",
+  "size": 2000398934016,
+  "health": "Healthy",
+  "status": "OK",
+  "temperature": 38,
+  "temperature_max": 0,
+  "wear": 0,
+  "hours": 31234,
+  "read_errors": 0,
+  "write_errors": 0,
+  "read_errors_corrected": null,
+  "write_errors_corrected": null,
+  "start_stop": 4021,
+  "load_unload": 98211,
+  "predict_failure": false,
+  "style": "GPT",
+  "smart": [
+   {
+    "id": 1,
+    "current": 200,
+    "worst": 200,
+    "threshold": 51,
+    "raw": 0
+   },
+   {
+    "id": 3,
+    "current": 172,
+    "worst": 168,
+    "threshold": 21,
+    "raw": 4383
+   },
+   {
+    "id": 4,
+    "current": 96,
+    "worst": 96,
+    "threshold": 0,
+    "raw": 4021
+   },
+   {
+    "id": 5,
+    "current": 200,
+    "worst": 200,
+    "threshold": 140,
+    "raw": 24
+   },
+   {
+    "id": 7,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 0
+   },
+   {
+    "id": 9,
+    "current": 58,
+    "worst": 58,
+    "threshold": 0,
+    "raw": 31234
+   },
+   {
+    "id": 10,
+    "current": 100,
+    "worst": 100,
+    "threshold": 0,
+    "raw": 0
+   },
+   {
+    "id": 12,
+    "current": 96,
+    "worst": 96,
+    "threshold": 0,
+    "raw": 3987
+   },
+   {
+    "id": 192,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 112
+   },
+   {
+    "id": 193,
+    "current": 168,
+    "worst": 168,
+    "threshold": 0,
+    "raw": 98211
+   },
+   {
+    "id": 194,
+    "current": 112,
+    "worst": 99,
+    "threshold": 0,
+    "raw": 38
+   },
+   {
+    "id": 196,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 24
+   },
+   {
+    "id": 197,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 0
+   },
+   {
+    "id": 198,
+    "current": 100,
+    "worst": 253,
+    "threshold": 0,
+    "raw": 0
+   },
+   {
+    "id": 199,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 3
+   },
+   {
+    "id": 200,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 0
+   }
+  ]
+ },
+ {
+  "number": 2,
+  "name": "ST1000DM003-1CH162",
+  "serial": "Z1D9ABCD",
+  "media": "HDD",
+  "bus": "SATA",
+  "spindle": 7200,
+  "firmware": "CC47",
+  "size": 1000204886016,
+  "health": "Warning",
+  "status": "OK",
+  "temperature": 47,
+  "temperature_max": 0,
+  "wear": 0,
+  "hours": 45012,
+  "read_errors": 0,
+  "write_errors": 0,
+  "read_errors_corrected": null,
+  "write_errors_corrected": null,
+  "start_stop": 9120,
+  "load_unload": null,
+  "predict_failure": false,
+  "style": "MBR",
+  "smart": [
+   {
+    "id": 1,
+    "current": 104,
+    "worst": 99,
+    "threshold": 6,
+    "raw": 6894123
+   },
+   {
+    "id": 5,
+    "current": 88,
+    "worst": 88,
+    "threshold": 10,
+    "raw": 312
+   },
+   {
+    "id": 9,
+    "current": 49,
+    "worst": 49,
+    "threshold": 0,
+    "raw": 45012
+   },
+   {
+    "id": 187,
+    "current": 92,
+    "worst": 92,
+    "threshold": 0,
+    "raw": 8
+   },
+   {
+    "id": 188,
+    "current": 100,
+    "worst": 99,
+    "threshold": 0,
+    "raw": 2
+   },
+   {
+    "id": 194,
+    "current": 47,
+    "worst": 55,
+    "threshold": 0,
+    "raw": 47
+   },
+   {
+    "id": 197,
+    "current": 100,
+    "worst": 100,
+    "threshold": 0,
+    "raw": 16
+   },
+   {
+    "id": 198,
+    "current": 100,
+    "worst": 100,
+    "threshold": 0,
+    "raw": 16
+   },
+   {
+    "id": 199,
+    "current": 200,
+    "worst": 200,
+    "threshold": 0,
+    "raw": 0
+   }
+  ]
+ },
+ {
+  "number": 3,
+  "name": "WD Elements 25A2 USB Device",
+  "serial": "57584D31",
+  "media": "",
+  "bus": "USB",
+  "spindle": null,
+  "firmware": "1021",
+  "size": 4000752599040,
+  "health": "Healthy",
+  "status": "OK",
+  "temperature": 0,
+  "temperature_max": 0,
+  "wear": 0,
+  "hours": null,
+  "read_errors": null,
+  "write_errors": null,
+  "read_errors_corrected": null,
+  "write_errors_corrected": null,
+  "start_stop": null,
+  "load_unload": null,
+  "smart": null,
+  "predict_failure": null,
+  "style": "GPT"
+ },
+ {
+  "number": 4,
+  "name": "AMD-RAID Array 1",
+  "serial": "0000AB12CD34EF56",
+  "media": "SSD",
+  "bus": "RAID",
+  "spindle": 0,
+  "firmware": "9.3",
+  "size": 3999667322880,
+  "health": "Healthy",
+  "status": "OK",
+  "temperature": 0,
+  "temperature_max": 0,
+  "wear": 0,
+  "hours": null,
+  "read_errors": null,
+  "write_errors": null,
+  "read_errors_corrected": null,
+  "write_errors_corrected": null,
+  "start_stop": null,
+  "load_unload": null,
+  "smart": null,
+  "predict_failure": null,
+  "style": "GPT"
+ }
 ]

@@ -11,6 +11,17 @@ Added
   shown as "not reported", never as 0. USB enclosures and RAID arrays that hide health data get an
   explanation instead of a guess. "Recover files from this disk" opens File Recovery with the disk
   selected. Demo data: `BENCHWISE_FAKE_HEALTH=docs\demo-health.json`; tests: `tests\test_diskhealth.py`.
+- **Disks inside AMD RAID arrays.** Windows only sees the array; the disks in it are now listed one by
+  one with their own verdict (temperature, wear, spare, data written, media errors, unexpected
+  shutdowns for NVMe; the SMART table for SATA). This uses AMD_RC2t7, a third-party library by Gakuto
+  Matsumura that CrystalDiskInfo also uses. It is not shipped: on request it is downloaded from its
+  official site with a progress bar, accepted only if its SHA-256 matches the pinned release and its
+  signature is valid, and run in a separate process that is never killed. Source, developer and a
+  disclaimer are shown wherever it is used. NVMe health checks (critical warning bits, spare below
+  threshold, media errors, time above critical temperature) apply to every NVMe disk.
+- **New version notice.** A card with a blinking amber frame at the bottom right when GitHub has a
+  newer release; it opens a panel with the release notes in the interface language, tool by tool
+  (format: `docs/release-notes/`). `BENCHWISE_NO_UPDATE_CHECK=1` turns it off.
 
 Fixed
 
@@ -19,6 +30,8 @@ Fixed
   shows exactly 3 lines (5 on the results page), keeps the last line in view, and a short window
   shrinks the disk and file lists (they scroll) instead of the log or the options.
 - Benchwise opens in the middle of the screen; the title reads Benchwise@idlepose.com.
+- Switching pages no longer redraws them: pages and tools stay laid out and are only raised, category
+  pages are built in the background, and Disk Health swaps its detail in one go.
 
 ## 1.1.0
 

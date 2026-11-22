@@ -54,7 +54,7 @@ def test_unknown_is_not_zero():
     res = verdict.assess(usb)
     assert res["level"] == "unknown" and res["reasons"][0][1] == "no_data_usb", res
     raid = verdict.assess(data._clean({"number": 0, "bus": "RAID", "temperature": 0, "wear": 0, "smart": None}))
-    assert raid["level"] == "unknown" and raid["reasons"][0][1] == "no_data_raid", raid
+    assert raid["level"] == "unknown" and raid["reasons"][0][1] == "no_data_raid", raid  # not AMD: generic text
     # a new SSD really at 0 % wear, with other figures present, keeps its 0
     ssd = data._clean({"number": 1, "bus": "NVMe", "media": "SSD", "temperature": 40, "wear": 0, "hours": 10,
                        "read_errors": 0, "write_errors": 0, "smart": None})
@@ -65,7 +65,7 @@ def test_demo_disks():
     os.environ["BENCHWISE_FAKE_HEALTH"] = os.path.join(ROOT, "docs", "demo-health.json")
     disks = {d["number"]: d for d in data.collect()}
     levels = {n: verdict.assess(d)["level"] for n, d in disks.items()}
-    assert levels == {0: "good", 1: "warning", 2: "bad", 3: "unknown"}, levels
+    assert levels == {0: "good", 1: "warning", 2: "bad", 3: "unknown", 4: "unknown"}, levels
     keys = {r[1] for r in verdict.assess(disks[1])["reasons"]}
     assert keys == {"reallocated", "crc"}, keys
     keys2 = {r[1] for r in verdict.assess(disks[2])["reasons"]}
@@ -83,6 +83,50 @@ def test_thresholds():
     assert verdict.assess(dict(hot_hdd, media="SSD"))["level"] == "good"      # SSDs run warmer
     assert verdict.assess({"number": 0, "media": "SSD", "wear": 92, "temperature": 40, "smart": []})["level"] == "bad"
     assert verdict.assess({"number": 0, "predict_failure": True, "smart": []})["level"] == "bad"
+
+
+def nvme_blob(warn=0, kelvin=315, spare=100, spare_thr=5, used=2, cycles=230, hours=1237, unsafe=166, media=0):
+    b = bytearray(512)
+    b[0] = warn
+    b[1:3] = kelvin.to_bytes(2, "little")
+    b[3], b[4], b[5] = spare, spare_thr, used
+    b[48:64] = (30138973).to_bytes(16, "little")           # data units written (x 512 000 bytes)
+    b[112:128] = cycles.to_bytes(16, "little")
+    b[128:144] = hours.to_bytes(16, "little")
+    b[144:160] = unsafe.to_bytes(16, "little")
+    b[160:176] = media.to_bytes(16, "little")
+    b[200:202] = kelvin.to_bytes(2, "little")
+    return base64.b64encode(bytes(b)).decode()
+
+
+def test_amd_raid_members():
+    from benchwise.diskhealth import amdraid
+    h = amdraid.parse_nvme(nvme_blob())
+    assert h["temperature"] == 42 and h["used"] == 2 and h["spare"] == 100 and h["hours"] == 1237
+    assert h["power_cycles"] == 230 and h["unsafe_shutdowns"] == 166 and h["sensors"] == [42]
+    assert round(h["data_written"] / 1e12, 1) == 15.4
+    assert amdraid.parse_nvme(base64.b64encode(bytes(512)).decode()) is None      # empty block: no data
+
+    array = data._clean({"number": 0, "name": "AMD-RAID Array 1", "bus": "RAID", "media": "SSD", "temperature": 0,
+                         "wear": 0, "smart": None, "system": True})
+    array["id"] = 0
+    assert amdraid.is_amd_raid(array)
+    m0 = amdraid.member_disk(array, {"index": 0, "model": "SSD A", "nvme": True, "ssd": True, "size": 2 * 10 ** 12,
+                                     "smart": nvme_blob()})
+    m1 = amdraid.member_disk(array, {"index": 1, "model": "SSD B", "nvme": True, "ssd": True, "size": 2 * 10 ** 12,
+                                     "smart": nvme_blob(media=3, kelvin=350)})
+    assert m0["id"] == "0.0" and m0["temperature"] == 42 and m0["wear"] == 2 and m0["bus"] == "NVMe"
+    r0 = verdict.assess(m0)
+    assert r0["level"] == "good" and ("info", "nvme_unsafe", {"n": 166, "of": 230}) in r0["reasons"], r0
+    r1 = verdict.assess(m1)
+    assert r1["level"] == "bad" and {"nvme_media_errors", "hot"} <= {r[1] for r in r1["reasons"]}, r1
+    # the array is as bad as its worst member, and says which one
+    array["members"] = [m0, m1]
+    ra = verdict.assess(array)
+    assert ra["level"] == "bad" and ra["reasons"][0] == ("bad", "raid_member_bad", {"name": "SSD B", "n": 2}), ra
+    # critical warning bits from the SSD itself
+    assert verdict.assess(dict(m0, nvme=amdraid.parse_nvme(nvme_blob(warn=0x08))))["level"] == "bad"
+    assert verdict.assess(dict(m0, nvme=amdraid.parse_nvme(nvme_blob(spare=4))))["level"] == "bad"
 
 
 if __name__ == "__main__":

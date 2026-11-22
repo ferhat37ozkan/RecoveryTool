@@ -146,18 +146,39 @@ To see what the scanner finds in an image without recovering anything:
 
 ## Making a release
 
-1. Bump the version in both places.
-2. Run `.\build.ps1`.
-3. Start the exe once and recover something from an image to make sure the build works.
-4. Tag and upload:
+1. Bump the version in `benchwise/__init__.py` and `tools/version_info.txt`.
+2. Write the release notes in `docs/release-notes/<version>.md`, in both languages (format below).
+3. Run `.\build.ps1`.
+4. Start the exe once and recover something from an image to make sure the build works.
+5. Tag and upload:
 
 ```powershell
-git tag v1.0.2
-git push origin v1.0.2
-gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "v1.1.0" --notes "what changed"
+git tag v1.1.0
+git push origin v1.1.0
+gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "Benchwise 1.1.0" --notes-file docs\release-notes\1.1.0.md
 ```
 
 `dist\` is in `.gitignore` on purpose. The exe goes into the release, not into the repository.
+
+**Update notice.** A running Benchwise asks GitHub for the latest release of `REPO`
+(`benchwise/__init__.py`) a few seconds after start. If its tag is newer than the running version
+(not a draft or pre-release), a card with a blinking amber frame appears at the bottom right; it
+opens a panel with the release notes and a download button (the release's `Benchwise.exe`). Only a
+`Benchwise/<version>` user agent is sent. `BENCHWISE_NO_UPDATE_CHECK=1` turns the check off.
+
+**Release notes format.** The panel shows the part in the user's language, tool by tool:
+
+```markdown
+<!-- tr -->
+### Disk Sağlığı
+- AMD RAID içindeki diskler ayrı ayrı gösteriliyor
+<!-- en -->
+### Disk Health
+- Disks inside AMD RAID arrays are listed one by one
+```
+
+`## Türkçe` / `## English` headings work as section markers too. Notes without sections are shown
+as they are.
 
 ---
 
@@ -290,15 +311,26 @@ Kurtarma yapmadan, tarayıcının bir imajda ne bulduğunu görmek için:
 
 ## Sürüm yayınlama
 
-1. Sürüm numarasını iki yerde de artırın.
-2. `.\build.ps1` çalıştırın.
-3. Exe'yi bir kez açıp bir imajdan kurtarma yaparak derlemenin çalıştığını görün.
-4. Etiketleyip yükleyin:
+1. Sürüm numarasını `benchwise/__init__.py` ve `tools/version_info.txt` içinde artırın.
+2. Sürüm notlarını iki dilde `docs/release-notes/<sürüm>.md` dosyasına yazın (biçim aşağıda).
+3. `.\build.ps1` çalıştırın.
+4. Exe'yi bir kez açıp bir imajdan kurtarma yaparak derlemenin çalıştığını görün.
+5. Etiketleyip yükleyin:
 
 ```powershell
-git tag v1.0.2
-git push origin v1.0.2
-gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "v1.1.0" --notes "neler değişti"
+git tag v1.1.0
+git push origin v1.1.0
+gh release create v1.1.0 dist\Benchwise.exe dist\Benchwise-cli.exe --title "Benchwise 1.1.0" --notes-file docs\release-notes\1.1.0.md
 ```
 
 `dist\` bilerek `.gitignore` içinde. Exe depoya değil, sürüme (release) eklenir.
+
+**Güncelleme bildirimi.** Çalışan Benchwise, açıldıktan birkaç saniye sonra GitHub'dan `REPO`'nun
+(`benchwise/__init__.py`) son sürümünü sorar. Etiket çalışan sürümden yeniyse (taslak veya ön sürüm
+değilse) sağ altta sarı-turuncu çerçevesi yanıp sönen bir kart çıkar; kart, sürüm notlarını ve
+indirme düğmesini (sürümdeki `Benchwise.exe`) gösteren bir panel açar. Yalnızca `Benchwise/<sürüm>`
+tanıtıcısı gönderilir. `BENCHWISE_NO_UPDATE_CHECK=1` kontrolü kapatır.
+
+**Sürüm notu biçimi.** Panel, kullanıcının dilindeki bölümü araç araç gösterir: her dil `<!-- tr -->`
+/ `<!-- en -->` (ya da `## Türkçe` / `## English`) ile başlar, içinde `### Araç` başlıkları ve `- `
+maddeleri olur. Örnek: `docs/release-notes/1.1.0.md`. Bölümsüz notlar olduğu gibi gösterilir.

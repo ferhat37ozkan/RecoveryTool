@@ -5,7 +5,8 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+import webbrowser
+from tkinter import messagebox, ttk
 
 import customtkinter as ctk
 
@@ -14,7 +15,7 @@ from recoverytool.model import human_size
 
 from .. import ui
 from ..ui import BG, BORDER, CARD, CARD_HOVER, LEVEL, MUTED, TEXT
-from . import data, verdict
+from . import amdraid, data, verdict
 
 LIST_WIDTH = 300
 
@@ -49,6 +50,7 @@ class DiskHealthView(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master, fg_color=BG)
         self.disks, self.results, self.selected, self.loading, self.error = [], {}, None, False, None
+        self.dl = None              # (step, done, total) while AMD_RC2t7 is being downloaded
         self.events = queue.Queue()
         style = ttk.Style(self)
         style.configure("Health.Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT, rowheight=26,
@@ -74,22 +76,66 @@ class DiskHealthView(ctk.CTkFrame):
 
         def work():
             try:
-                self.events.put(("done", data.collect()))
+                self.events.put(("done", self.with_members(data.collect())))
             except Exception as ex:          # shown to the user; the screen stays usable
                 self.events.put(("failed", str(ex)))
         threading.Thread(target=work, daemon=True).start()
+
+    @staticmethod
+    def with_members(disks):
+        """Insert the member disks of AMD RAID arrays right after their array (when the library is set up)."""
+        out = []
+        for d in disks:
+            out.append(d)
+            if amdraid.is_amd_raid(d) and amdraid.supported() and amdraid.installed():
+                members, err = amdraid.read_members()
+                if members:
+                    d["members"] = [amdraid.member_disk(d, m) for m in members]
+                    out += d["members"]
+                else:
+                    d["raid_error"] = err
+        return out
+
+    def get_library(self):
+        if not messagebox.askyesno(t("dh_raid_title"), t("dh_raid_ask", v=amdraid.VERSION, url=amdraid.URL,
+                                                         lic=amdraid.LICENSE_URL)):
+            return
+        self.loading = True
+        self.refresh_btn.configure(state="disabled")
+        self.status.configure(text=t("dh_raid_downloading"))
+        self.dl = ("download", 0, 0)
+        self.render_detail()
+
+        def work():
+            try:
+                amdraid.download(lambda step, done=0, total=0: self.events.put(("dl", (step, done, total))))
+            except Exception as ex:          # nothing is installed unless every check passed
+                self.events.put(("failed", t("dh_raid_failed", err=ex)))
+                return
+            try:
+                self.events.put(("done", self.with_members(data.collect())))
+            except Exception as ex:
+                self.events.put(("failed", str(ex)))
+        threading.Thread(target=work, daemon=True).start()
+
+    def disk(self, key):
+        return next((x for x in self.disks if x["id"] == key), None)
 
     def poll(self):
         try:
             while True:
                 kind, value = self.events.get_nowait()
+                if kind == "dl":
+                    self.show_download(*value)
+                    continue
+                self.dl = None
                 self.loading = False
                 self.refresh_btn.configure(state="normal")
                 if kind == "done":
                     self.disks = value
-                    self.results = {d["number"]: verdict.assess(d) for d in value}
+                    self.results = {d["id"]: verdict.assess(d) for d in value}
                     if self.selected not in self.results:
-                        self.selected = value[0]["number"] if value else None
+                        self.selected = value[0]["id"] if value else None
                     self.status.configure(text=" " if value else t("dh_none"))
                 else:
                     self.error = value
@@ -99,6 +145,18 @@ class DiskHealthView(ctk.CTkFrame):
             pass
         if self.winfo_exists():
             self.after(150, self.poll)
+
+    def show_download(self, step, done, total):
+        self.dl = (step, done, total)
+        bar, label = getattr(self, "dl_bar", None), getattr(self, "dl_label", None)
+        if bar is None or not bar.winfo_exists():
+            return
+        if step == "download":
+            bar.set(done / total if total else 0)
+            label.configure(text=t("dh_dl_download", done=human_size(done), total=human_size(total) if total else "?"))
+        else:
+            bar.set(1)
+            label.configure(text=t("dh_dl_" + step))
 
     # -- layout ---------------------------------------------------------------------------------
     def build(self):
@@ -117,6 +175,7 @@ class DiskHealthView(ctk.CTkFrame):
         self.listf.pack(side="left", fill="y", padx=(0, 12))
         self.detail = ctk.CTkScrollableFrame(body, fg_color=BG, scrollbar_button_color=BORDER)
         self.detail.pack(side="left", fill="both", expand=True)
+        self.shown, self.items = None, {}
         if self.disks:
             self.render()
 
@@ -127,52 +186,108 @@ class DiskHealthView(ctk.CTkFrame):
     def render(self):
         for w in self.listf.winfo_children():
             w.destroy()
+        self.items = {}
         for d in self.disks:
             self.disk_item(d)
         self.render_detail()
 
+    def select(self, key):
+        """Another disk was clicked: recolour two list entries, swap the detail (no full redraw)."""
+        if key == self.selected:
+            return
+        for k, sel in ((self.selected, False), (key, True)):
+            item = self.items.get(k)
+            if item is not None:
+                item.configure(fg_color=CARD_HOVER if sel else CARD, border_color=ui.ACCENT if sel else BORDER)
+        self.selected = key
+        self.render_detail()
+
     def disk_item(self, d):
-        res = self.results[d["number"]]
+        res = self.results[d["id"]]
         color = LEVEL[res["level"]]
-        sel = d["number"] == self.selected
+        sel = d["id"] == self.selected
+        member = "member_of" in d
         item = ctk.CTkFrame(self.listf, fg_color=CARD_HOVER if sel else CARD, corner_radius=10, border_width=1,
                             border_color=ui.ACCENT if sel else BORDER)
-        item.pack(fill="x", pady=(0, 8))
+        item.pack(fill="x", pady=(0, 8), padx=(22, 0) if member else 0)
+        self.items[d["id"]] = item
         stripe = ctk.CTkFrame(item, fg_color=color, width=5, height=10, corner_radius=3)
         stripe.pack(side="left", fill="y", padx=(8, 0), pady=10)
         box = ctk.CTkFrame(item, fg_color="transparent")
         box.pack(side="left", fill="both", expand=True, padx=10, pady=8)
         ctk.CTkLabel(box, text=d["name"] or "Disk %d" % d["number"], font=("Segoe UI Semibold", 13), text_color=TEXT,
                      anchor="w", wraplength=LIST_WIDTH - 60, justify="left").pack(fill="x")
-        bits = ["Disk %d" % d["number"], human_size(d["size"]), d.get("bus") or ""]
-        if d.get("system"):
+        bits = [t("dh_member_of", n=d["number"], i=d["member_index"] + 1) if member else "Disk %d" % d["number"],
+                human_size(d["size"]), d.get("bus") or ""]
+        if d.get("system") and not member:
             bits.append(t("dh_system"))
         ctk.CTkLabel(box, text=" · ".join(b for b in bits if b), font=("Segoe UI", 11), text_color=MUTED,
                      anchor="w").pack(fill="x")
         ctk.CTkLabel(box, text=t("dh_level_" + res["level"]), font=("Segoe UI Semibold", 12), text_color=color,
                      anchor="w").pack(fill="x", pady=(2, 0))
 
-        def pick(e, n=d["number"]):
-            self.selected = n
-            self.render()
+        def pick(e, n=d["id"]):
+            self.select(n)
         for w in (item, stripe, box) + tuple(box.winfo_children()):
             w.bind("<Button-1>", pick)
 
     def render_detail(self):
-        for w in self.detail.winfo_children():
-            w.destroy()
-        d = next((x for x in self.disks if x["number"] == self.selected), None)
-        if d is None:
-            return
-        res = self.results[d["number"]]
+        """Build the new detail in a frame that is not shown yet, then swap it in at once."""
+        old = getattr(self, "shown", None)
+        self.target = ctk.CTkFrame(self.detail, fg_color="transparent")
+        d = self.disk(self.selected)
+        if d is not None:
+            self.fill_detail(d)
+        self.target.pack(fill="both", expand=True)
+        self.shown = self.target
+        if old is not None:
+            old.destroy()
+        self.detail._parent_canvas.yview_moveto(0)
+
+    def fill_detail(self, d):
+        res = self.results[d["id"]]
         self.verdict_card(d, res)
-        self.tiles(res["figures"], res)
+        if amdraid.is_amd_raid(d) and not d.get("members"):
+            self.raid_card(d)
+        if not d.get("members"):
+            self.tiles(res["figures"], res, nvme=bool(d.get("nvme")))
         self.info_card(d)
-        self.smart_card(d)
+        if not d.get("nvme") and not d.get("members"):
+            self.smart_card(d)
+
+    def raid_card(self, d):
+        c = ui.card(self.target, t("dh_raid_title"))
+        c.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(c, text=t("dh_raid_body"), font=("Segoe UI", 12), text_color=TEXT, anchor="w", justify="left",
+                     wraplength=700).pack(fill="x", padx=18)
+        err = d.get("raid_error")
+        if err:
+            ctk.CTkLabel(c, text=t("dh_raid_read_failed", err=err), font=("Segoe UI", 12), text_color=ui.WARN,
+                         anchor="w", justify="left", wraplength=700).pack(fill="x", padx=18, pady=(8, 0))
+        ctk.CTkLabel(c, text=t("dh_raid_disclaimer", by=amdraid.SIGNER, site=amdraid.INFO_URL), font=("Segoe UI", 11),
+                     text_color=MUTED, anchor="w", justify="left", wraplength=700).pack(fill="x", padx=18, pady=(8, 0))
+        if self.dl:
+            box = ctk.CTkFrame(c, fg_color="transparent")
+            box.pack(fill="x", padx=18, pady=(10, 14))
+            self.dl_label = ctk.CTkLabel(box, text=" ", font=("Segoe UI", 12), text_color=TEXT, anchor="w")
+            self.dl_label.pack(fill="x")
+            self.dl_bar = ctk.CTkProgressBar(box, height=10, fg_color=BORDER, progress_color=ui.ACCENT, corner_radius=5)
+            self.dl_bar.pack(fill="x", pady=(4, 0))
+            self.show_download(*self.dl)
+            return
+        row = ctk.CTkFrame(c, fg_color="transparent")
+        row.pack(fill="x", padx=18, pady=(10, 14))
+        if not amdraid.supported():
+            ctk.CTkLabel(row, text=t("dh_raid_source_only"), font=("Segoe UI", 12), text_color=MUTED,
+                         anchor="w").pack(side="left")
+        elif not amdraid.installed():
+            ui.button(row, t("dh_raid_get"), self.get_library, 230, primary=True).pack(side="left")
+        ui.button(row, t("dh_raid_license"), lambda: webbrowser.open(amdraid.LICENSE_URL), 90).pack(
+            side="left", padx=(8, 0))
 
     def verdict_card(self, d, res):
         color = LEVEL[res["level"]]
-        c = ui.card(self.detail)
+        c = ui.card(self.target)
         c.pack(fill="x", pady=(0, 10))
         row = ctk.CTkFrame(c, fg_color="transparent")
         row.pack(fill="x", padx=18, pady=(14, 4))
@@ -195,21 +310,14 @@ class DiskHealthView(ctk.CTkFrame):
             ctk.CTkLabel(line, text=t("dh_r_" + key, **({**args, "state": state_text(args["state"])} if "state" in args else args)), font=("Segoe UI", 12), text_color=TEXT, anchor="w",
                          justify="left", wraplength=640).pack(side="left", fill="x", expand=True)
 
-    def tiles(self, f, res):
-        c = ctk.CTkFrame(self.detail, fg_color="transparent")
+    def tiles(self, f, res, nvme=False):
+        c = ctk.CTkFrame(self.target, fg_color="transparent")
         c.pack(fill="x", pady=(0, 10))
         temp = f["temperature"]
-        items = [
-            ("dh_t_temp", None if temp is None else "%d °C" % temp, self.reason_color(res, ("too_hot", "hot"))),
-            ("dh_t_hours", hours_text(f["hours"]), None),
-            ("dh_t_wear", None if f["wear"] is None else t("dh_pct", n=f["wear"]), self.reason_color(res, ("worn", "wearing"))),
-            ("dh_t_realloc", None if f["reallocated"] is None else count(f["reallocated"]),
-             self.reason_color(res, ("reallocated",))),
-            ("dh_t_pending", None if f["pending"] is None else count(f["pending"]), self.reason_color(res, ("pending",))),
-            ("dh_t_errors", None if f["read_errors"] is None and f["write_errors"] is None else
-             count((f["read_errors"] or 0) + (f["write_errors"] or 0)), self.reason_color(res, ("io_errors",))),
-            ("dh_t_cycles", None if f["power_cycles"] is None else count(f["power_cycles"]), None),
-        ]
+        if nvme:
+            items = self.nvme_tiles(f, res)
+        else:
+            items = self.ata_tiles(f, res)
         cols = 4
         for i, (key, value, color) in enumerate(items):
             tile = ui.card(c)
@@ -223,17 +331,46 @@ class DiskHealthView(ctk.CTkFrame):
         for i in range(cols):
             c.grid_columnconfigure(i, weight=1, uniform="tile")
 
+    def nvme_tiles(self, f, res):
+        temp = f["temperature"]
+        return [
+            ("dh_t_temp", None if temp is None else "%d °C" % temp,
+             self.reason_color(res, ("too_hot", "hot", "nvme_temp_warn"))),
+            ("dh_t_hours", hours_text(f["hours"]), None),
+            ("dh_t_wear", None if f["wear"] is None else t("dh_pct", n=f["wear"]), self.reason_color(res, ("worn", "wearing"))),
+            ("dh_t_spare", None if f["spare"] is None else t("dh_pct", n=f["spare"]), self.reason_color(res, ("nvme_spare_low",))),
+            ("dh_t_written", None if f["written"] is None else human_size(f["written"]), None),
+            ("dh_t_media", None if f["media_errors"] is None else count(f["media_errors"]),
+             self.reason_color(res, ("nvme_media_errors",))),
+            ("dh_t_cycles", None if f["power_cycles"] is None else count(f["power_cycles"]), None),
+            ("dh_t_unsafe", None if f["unsafe"] is None else count(f["unsafe"]), None),
+        ]
+
+    def ata_tiles(self, f, res):
+        temp = f["temperature"]
+        return [
+            ("dh_t_temp", None if temp is None else "%d °C" % temp, self.reason_color(res, ("too_hot", "hot"))),
+            ("dh_t_hours", hours_text(f["hours"]), None),
+            ("dh_t_wear", None if f["wear"] is None else t("dh_pct", n=f["wear"]), self.reason_color(res, ("worn", "wearing"))),
+            ("dh_t_realloc", None if f["reallocated"] is None else count(f["reallocated"]),
+             self.reason_color(res, ("reallocated",))),
+            ("dh_t_pending", None if f["pending"] is None else count(f["pending"]), self.reason_color(res, ("pending",))),
+            ("dh_t_errors", None if f["read_errors"] is None and f["write_errors"] is None else
+             count((f["read_errors"] or 0) + (f["write_errors"] or 0)), self.reason_color(res, ("io_errors",))),
+            ("dh_t_cycles", None if f["power_cycles"] is None else count(f["power_cycles"]), None),
+        ]
+
     @staticmethod
     def reason_color(res, keys):
         levels = [lv for lv, key, _ in res["reasons"] if key in keys]
         return LEVEL[max(levels, key=verdict.ORDER.get)] if levels else None
 
     def info_card(self, d):
-        c = ui.card(self.detail, t("dh_info"))
+        c = ui.card(self.target, t("dh_info"))
         c.pack(fill="x", pady=(0, 10))
         rows = [("dh_model", d.get("name")), ("dh_serial", d.get("serial")), ("dh_bus", d.get("bus")),
                 ("dh_media", media_text(d)), ("dh_capacity", human_size(d["size"]) if d.get("size") else ""),
-                ("dh_firmware", d.get("firmware")), ("dh_status", " · ".join(state_text(x) for x in (d.get("health"), d.get("status")) if x))]
+                ("dh_firmware", d.get("firmware")), ("dh_link", d.get("speed")), ("dh_status", " · ".join(state_text(x) for x in (d.get("health"), d.get("status")) if x))]
         grid = ctk.CTkFrame(c, fg_color="transparent")
         grid.pack(fill="x", padx=18, pady=(0, 12))
         for i, (key, value) in enumerate(r for r in rows if r[1]):
@@ -241,9 +378,13 @@ class DiskHealthView(ctk.CTkFrame):
                 row=i, column=0, sticky="w", padx=(0, 24), pady=1)
             ctk.CTkLabel(grid, text=value, font=("Segoe UI Semibold", 12), text_color=TEXT, anchor="w").grid(
                 row=i, column=1, sticky="w", pady=1)
+        if "member_of" in d:
+            ctk.CTkLabel(c, text=t("dh_used_by", v=amdraid.VERSION, by=amdraid.SIGNER, site=amdraid.INFO_URL),
+                         font=("Segoe UI", 11), text_color=MUTED, justify="left", wraplength=700,
+                         anchor="w").pack(fill="x", padx=18, pady=(0, 12))
 
     def smart_card(self, d):
-        c = ui.card(self.detail, t("dh_smart"))
+        c = ui.card(self.target, t("dh_smart"))
         c.pack(fill="x", pady=(0, 10))
         attrs = d.get("smart") or []
         if not attrs:
@@ -274,5 +415,6 @@ class DiskHealthView(ctk.CTkFrame):
         if hasattr(shell, "open_tool_id"):
             shell.open_tool_id("disk.recovery")
             view = getattr(shell, "views", {}).get("disk.recovery")
-            if view is not None and self.selected is not None:
-                view.select_disk(self.selected)
+            d = self.disk(self.selected)
+            if view is not None and d is not None:
+                view.select_disk(d["number"])         # a RAID member: its array, the disk Windows knows

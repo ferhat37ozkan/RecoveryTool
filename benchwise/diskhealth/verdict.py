@@ -54,12 +54,33 @@ def figures(disk):
                 break
     realloc = raw32(attr(disk, 5)) if attr(disk, 5) else None
     pending = raw32(attr(disk, 197)) if attr(disk, 197) else None
+    nv = disk.get("nvme") or {}
     return {"temperature": temp, "hours": hours, "wear": wear, "reallocated": realloc, "pending": pending,
             "read_errors": disk.get("read_errors"), "write_errors": disk.get("write_errors"),
-            "power_cycles": raw32(attr(disk, 12)) if attr(disk, 12) else disk.get("start_stop")}
+            "power_cycles": raw32(attr(disk, 12)) if attr(disk, 12) else disk.get("start_stop"),
+            "spare": nv.get("spare"), "written": nv.get("data_written"), "media_errors": nv.get("media_errors"),
+            "unsafe": nv.get("unsafe_shutdowns")}
+
+
+# NVMe "critical warning" bits (NVMe base specification, SMART / Health log byte 0)
+NVME_WARNINGS = ((0x01, "bad", "nvme_spare_low"), (0x02, "warning", "nvme_temp_warn"), (0x04, "bad", "nvme_degraded"),
+                 (0x08, "bad", "nvme_readonly"), (0x10, "warning", "nvme_backup_failed"))
+
+
+def assess_array(disk):
+    """A RAID array whose member disks could be read: as bad as its worst member."""
+    results = [assess(m) for m in disk["members"]]
+    level = max((r["level"] for r in results), key=ORDER.get) if results else "unknown"
+    reasons = [("info", "raid_members", {"n": len(results)})]
+    worst = [(m, r) for m, r in zip(disk["members"], results) if r["level"] == level and level in ("bad", "warning")]
+    for m, r in worst:
+        reasons.insert(0, (level, "raid_member_" + level, {"name": m["name"], "n": m["member_index"] + 1}))
+    return {"level": level, "reasons": reasons, "figures": figures(disk)}
 
 
 def assess(disk):
+    if disk.get("members"):
+        return assess_array(disk)
     reasons = []
 
     def add(level, key, **args):
@@ -87,6 +108,19 @@ def assess(disk):
     a = attr(disk, 199)
     if a and raw32(a) > 0:
         add("warning", "crc", n=raw32(a))
+    nv = disk.get("nvme")
+    if nv:
+        seen = set()
+        for bit, level, key in NVME_WARNINGS:
+            if nv["critical_warning"] & bit:
+                add(level, key)
+                seen.add(key)
+        if nv["spare_threshold"] and nv["spare"] <= nv["spare_threshold"] and "nvme_spare_low" not in seen:
+            add("bad", "nvme_spare_low")
+        if nv["media_errors"]:
+            add("bad", "nvme_media_errors", n=nv["media_errors"])
+        if nv["critical_temp_minutes"]:
+            add("warning", "nvme_overheated", n=nv["critical_temp_minutes"])
     errors = (f["read_errors"] or 0) + (f["write_errors"] or 0)
     if errors:
         add("bad", "io_errors", n=errors)
@@ -109,10 +143,13 @@ def assess(disk):
         level = "good"
     else:
         level = "unknown"
-        add("unknown", "no_data_raid" if disk.get("bus") == "RAID" else
+        amd = disk.get("bus") == "RAID" and "AMD-RAID" in (disk.get("name") or "").upper()
+        add("unknown", "no_data_amd_raid" if amd else "no_data_raid" if disk.get("bus") == "RAID" else
             "no_data_usb" if disk.get("bus") == "USB" else "no_data")
     if level == "good":
         add("good", "all_good")
+    if nv and nv["power_cycles"] and nv["unsafe_shutdowns"] >= 10 and nv["unsafe_shutdowns"] >= 0.3 * nv["power_cycles"]:
+        add("info", "nvme_unsafe", n=nv["unsafe_shutdowns"], of=nv["power_cycles"])
     if level in ("good", "warning") and known and not disk.get("smart") and not ssd and disk.get("bus") != "NVMe":
         add("info", "no_smart_table")
     reasons.sort(key=lambda r: -ORDER.get(r[0], 0))

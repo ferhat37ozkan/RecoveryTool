@@ -10,3 +10,4 @@ __version__ = "1.1.0"
 NAME = "Benchwise"
 DOMAIN = "idlepose.com"
 APP_NAME = "%s@%s" % (NAME, DOMAIN)       # window title, message boxes, reports, command-line help
+REPO = "ferhat37ozkan/RecoveryTool"       # GitHub repository whose releases the update check reads

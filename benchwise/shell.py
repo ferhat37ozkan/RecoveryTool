@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import tkinter as tk
 from tkinter import messagebox
 
@@ -46,7 +47,7 @@ class Card(ctk.CTkFrame):
         top.pack(fill="x", padx=18, pady=(18, 0))
         ctk.CTkLabel(top, text="", image=image).pack(side="left")
         for text, color, icon in badges:
-            b = ctk.CTkLabel(top, text=" " + text if icon else text, image=icon, compound="left",
+            b = ctk.CTkLabel(top, text=(" " + text if text else "") if icon else text, image=icon, compound="left",
                              font=("Segoe UI Semibold", 10), text_color=color, fg_color=BG, corner_radius=8,
                              height=22, padx=8)
             b.pack(side="right", anchor="n", padx=(6, 0))
@@ -110,8 +111,10 @@ class Shell(ctk.CTk):
         self.views = {}             # tool id -> its frame, kept while the window is open
         self.page = ("home",)       # ("home",) | ("category", cat) | ("tool", cat, tool)
         self.images = {}
+        self.notice = None          # the "new version" card, once the check found one
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.build()
+        self.after(2500, self.check_update)
         cat, tool = find_tool(open_tool) if open_tool else (None, None)
         if os.environ.get("RECOVERYTOOL_SELFTEST") or os.environ.get("RECOVERYTOOL_UITEST"):
             cat, tool = find_tool("disk.recovery")
@@ -168,10 +171,45 @@ class Shell(ctk.CTk):
                             font=("Segoe UI Semibold", 11), text_color=GOOD if self.admin else MUTED,
                             fg_color=CARD, corner_radius=8, height=28, padx=10)
         mode.pack(side="right", padx=(0, 8))
+        # Every page and tool view sits in the same cell of the body and stays there; switching only
+        # raises one above the others.  Nothing is unmapped and re-laid out, so there is no flicker.
         self.body = ctk.CTkFrame(self, fg_color=BG)
         self.body.pack(fill="both", expand=True)
+        self.body.grid_rowconfigure(0, weight=1)
+        self.body.grid_columnconfigure(0, weight=1)
         self.pages = {}
+        for view in self.views.values():
+            view.grid(in_=self.body, row=0, column=0, sticky="nsew")
         self.show(self.page)
+        self.after(300, self.prebuild)
+        if getattr(self, "notice", None) is not None:
+            self.notice.rebuild()
+
+    def check_update(self):
+        """Ask GitHub in the background; show the card if a newer release exists."""
+        from . import update
+        found = []
+        worker = threading.Thread(target=lambda: found.append(update.check()), daemon=True)
+        worker.start()
+
+        def wait():
+            if worker.is_alive():
+                return self.after(300, wait)
+            if found and found[0]:
+                self.show_update(found[0])
+        self.after(300, wait)
+
+    def show_update(self, info):
+        from .updatecard import UpdateNotice
+        self.notice = UpdateNotice(self, info)
+
+    def prebuild(self):
+        """Build the category pages while the user looks at the home page, so they open at once."""
+        for cat in CATEGORIES:
+            if "cat:" + cat.id not in self.pages:
+                self.category_page(cat)
+                self.update_idletasks()
+        self.show(self.page)                # keep whatever is on screen in front
 
     def crumb(self, text, command=None):
         ctk.CTkLabel(self.crumbs, text="›", font=("Segoe UI", 18), text_color=MUTED).pack(side="left", padx=8)
@@ -183,29 +221,41 @@ class Shell(ctk.CTk):
 
     def show(self, page):
         self.page = page
-        for w in self.body.pack_slaves():     # pages, and a tool view packed into the body
-            w.pack_forget()
         for w in self.crumbs.winfo_children():
             w.destroy()
         kind = page[0]
-        if kind == "home":
-            self.home_page().pack(fill="both", expand=True, padx=(22, 6), pady=(4, 12))
-        elif kind == "category":
-            self.crumb(t(page[1].key))
-            self.category_page(page[1]).pack(fill="both", expand=True, padx=(22, 6), pady=(4, 12))
-        else:
+        if kind == "tool":
             cat, tool = page[1], page[2]
             self.crumb(t(cat.key), lambda: self.open_category(cat))
             self.crumb(t(tool.key))
-            view = self.views[tool.id]
-            view.pack(in_=self.body, fill="both", expand=True)
-            view.lift(self.body)            # created before this body: keep it in front
+            for other in self.views.values():
+                if other is not self.views[tool.id]:
+                    other.lower(self.body)
+            self.views[tool.id].lift(self.body)     # tool views belong to the window: raise above the body
+            self.raise_notice()
+            return
+        for view in self.views.values():
+            view.lower(self.body)
+        if kind == "home":
+            self.home_page().tkraise()
+        else:
+            self.crumb(t(page[1].key))
+            self.category_page(page[1]).tkraise()
+        self.raise_notice()
+
+    def raise_notice(self):
+        if self.notice is not None:
+            self.notice.raise_()
+
+    def place_page(self, page):
+        page.grid(row=0, column=0, sticky="nsew", padx=(22, 6), pady=(4, 12))
+        return page
 
     # -- pages ----------------------------------------------------------------------------------
     def home_page(self):
         if "home" in self.pages:
             return self.pages["home"]
-        page = self.pages["home"] = ctk.CTkFrame(self.body, fg_color=BG)
+        page = self.pages["home"] = self.place_page(ctk.CTkFrame(self.body, fg_color=BG))
         ctk.CTkLabel(page, text=t("bw_tagline"), font=("Segoe UI", 13), text_color=MUTED, anchor="w").pack(
             fill="x", pady=(0, 14))
         grid = CardGrid(page, CARD_W)
@@ -223,7 +273,7 @@ class Shell(ctk.CTk):
         key = "cat:" + cat.id
         if key in self.pages:
             return self.pages[key]
-        page = self.pages[key] = ctk.CTkFrame(self.body, fg_color=BG)
+        page = self.pages[key] = self.place_page(ctk.CTkFrame(self.body, fg_color=BG))
         ctk.CTkLabel(page, text=t(cat.key + "_d"), font=("Segoe UI", 13), text_color=MUTED, anchor="w").pack(
             fill="x", pady=(0, 4))
         if not self.admin and any(tool.admin for tool in cat.tools):
@@ -236,7 +286,8 @@ class Shell(ctk.CTk):
             if not tool.ready:
                 badges.append((t("bw_soon"), MUTED, None))
             if tool.admin and not self.admin:
-                badges.append((t("bw_admin_badge"), WARN, self.shield()))
+                # next to "coming soon" there is only room for the shield itself
+                badges.append(("" if not tool.ready else t("bw_admin_badge"), WARN, self.shield()))
             card = Card(grid, self.image(tool.icon, cat.id, 52, tool.ready), t(tool.key), t(tool.key + "_d"),
                         lambda c=cat, x=tool: self.open_tool(c, x), badges=badges, width=TOOL_W, height=TOOL_H,
                         dim=not tool.ready)
@@ -256,7 +307,8 @@ class Shell(ctk.CTk):
         if tool.admin and not self.admin:
             return self.ask_admin(tool)
         if tool.id not in self.views:
-            self.views[tool.id] = tool.view(self)
+            view = self.views[tool.id] = tool.view(self)
+            view.grid(in_=self.body, row=0, column=0, sticky="nsew")
         self.show(("tool", cat, tool))
 
     def open_tool_id(self, tool_id):
@@ -282,7 +334,7 @@ class Shell(ctk.CTk):
             return messagebox.showinfo(APP_NAME, t("bw_lang_busy"))
         i18n.set_language("en" if i18n.language() == "tr" else "tr")
         for view in self.views.values():
-            view.pack_forget()
+            view.grid_forget()
             if hasattr(view, "relabel"):
                 view.relabel()
         self.build()

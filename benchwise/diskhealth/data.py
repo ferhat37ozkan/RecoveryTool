@@ -151,6 +151,7 @@ def collect():
     result = []
     for d in raw:
         d = _clean(dict(d))
+        d["id"] = d["number"]                  # members of a RAID array get "<array>.<n>" (amdraid.py)
         extra = layout.get(d["number"], {})
         d.setdefault("partitions", extra.get("partitions", []))
         d.setdefault("style", extra.get("style", ""))
