@@ -95,7 +95,7 @@ CATEGORIES = [
         Tool("network.netreset", "refresh", admin=True, view=_tool("netreset")),
     ]),
     Category("windows", "windows", [
-        Tool("windows.sfc", "shield", admin=True),
+        Tool("windows.sfc", "shield", admin=True, view=_tool("sfc")),
         Tool("windows.update", "refresh", admin=True),
         Tool("windows.drivers", "chip"),
         Tool("windows.startup", "rocket"),
