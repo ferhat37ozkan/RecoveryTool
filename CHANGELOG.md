@@ -22,6 +22,12 @@ Added
 - Ticking an AMD RAID array for the clock first offers to set up AMD_RC2t7 (the array reports no
   temperature itself); the disks inside it are then ticked one by one.
 
+Fixed
+
+- Start-up no longer flickers: the window appears fully drawn in one go. It used to be drawn piece by
+  piece, and the category pages built in the background flashed over the home page one after another.
+  The window also comes to the front reliably.
+
 ## 1.1.0
 
 The app is now **Benchwise**, a workbench of tools. RecoveryTool lives on as its first tool,
