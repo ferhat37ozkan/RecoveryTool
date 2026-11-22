@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.0
+
 Added
 
 - **Live disk temperatures next to the clock.** Tick "By the clock" on a disk in Disk Health and its
