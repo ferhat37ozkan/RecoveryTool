@@ -69,7 +69,7 @@ CATEGORIES = [
         Tool("disk.image", "copy", admin=True),
         Tool("disk.partitions", "pie", admin=True),
         Tool("disk.erase", "shred", admin=True),
-        Tool("disk.speed", "gauge", admin=True),
+        Tool("disk.speed", "gauge", view=_tool("speed")),
     ]),
     Category("system", "chip", [
         Tool("system.sysinfo", "info", view=_tool("sysinfo")),
