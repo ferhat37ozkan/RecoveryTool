@@ -167,3 +167,52 @@ def attr_state(a):
     if a["id"] == 199 and raw32(a) > 0:
         return "warning"
     return ""
+
+
+def health_percent(disk, res=None):
+    """A health figure 0-100 %, or None when the disk reports nothing.
+
+    Our own, simple rules (Hard Disk Sentinel's formula is not public):
+      SSD    100 minus the wear the drive reports; capped by the spare blocks left
+      HDD    100, minus points for reallocated, pending and uncorrectable sectors and errors
+      both   at most 5 % when the disk predicts its own failure or an attribute is past its
+             threshold; never above what the verdict says (at risk <= 39 %, watch it <= 79 %)
+    An array is as healthy as its worst member."""
+    res = res or assess(disk)
+    if disk.get("members"):
+        values = [health_percent(m) for m in disk["members"]]
+        values = [v for v in values if v is not None]
+        return min(values) if values else None
+    if res["level"] == "unknown":
+        return None
+    f = res["figures"]
+    score = 100.0
+    if f["wear"] is not None:
+        score = 100.0 - f["wear"]
+    nv = disk.get("nvme") or {}
+    if nv:
+        if nv.get("spare_threshold") and nv.get("spare", 100) <= nv["spare_threshold"]:
+            score = min(score, 10)
+        elif nv.get("spare") is not None:
+            score = min(score, nv["spare"])
+        if nv.get("media_errors"):
+            score = min(score, 60) - min(30, 5 * nv["media_errors"])
+    count = lambda aid: raw32(attr(disk, aid)) if attr(disk, aid) else 0
+    score -= min(50, 0.5 * count(5))                 # reallocated sectors
+    score -= min(60, 3 * count(197))                 # pending sectors
+    score -= min(40, 2 * count(198))                 # offline uncorrectable
+    score -= min(30, 2 * count(187))                 # reported uncorrectable
+    score -= min(30, 10 * count(10))                 # spin retries
+    score -= min(40, 5 * ((f["read_errors"] or 0) + (f["write_errors"] or 0)))
+    keys = {r[1] for r in res["reasons"]}
+    if "predict_failure" in keys or "below_threshold" in keys:
+        score = min(score, 5)
+    if disk.get("health") == "Unhealthy":
+        score = min(score, 10)
+    elif disk.get("health") == "Warning":
+        score = min(score, 60)
+    if res["level"] == "bad":
+        score = min(score, 39)
+    elif res["level"] == "warning":
+        score = min(score, 79)
+    return max(0, min(100, int(round(score))))

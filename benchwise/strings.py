@@ -232,6 +232,10 @@ i18n.STRINGS.update({
                             "AMD RAID dizisinin içindeki diskler yalnızca Benchwise.exe ile okunabilir."),
     "tray_open": ("Open Benchwise", "Benchwise'ı aç"),
     "tray_quit": ("Quit", "Çıkış"),
+    "tray_health_pct": ("Health: {pct} % · {level} · click to open", "Sağlık: %{pct} · {level} · açmak için tıklayın"),
+    "dh_level_pct": ("{level} · {pct} %", "{level} · %{pct}"),
+    "live_interval": ("Temperatures by the clock every", "Saatin yanındaki sıcaklık yenilemesi"),
+    "live_seconds": ("{n} s", "{n} sn"),
     "tray_health": ("Health: {level} · click to open", "Sağlık: {level} · açmak için tıklayın"),
     "tray_hidden_title": ("Benchwise keeps watching", "Benchwise izlemeye devam ediyor"),
     "tray_hidden_body": ("The disk temperatures stay next to the clock. Click one to open Benchwise; right-click "

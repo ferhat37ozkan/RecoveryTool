@@ -129,6 +129,24 @@ def test_amd_raid_members():
     assert verdict.assess(dict(m0, nvme=amdraid.parse_nvme(nvme_blob(spare=4))))["level"] == "bad"
 
 
+def test_health_percent():
+    os.environ["BENCHWISE_FAKE_HEALTH"] = os.path.join(ROOT, "docs", "demo-health.json")
+    disks = {d["number"]: d for d in data.collect()}
+    pct = {n: verdict.health_percent(d) for n, d in disks.items()}
+    assert pct[0] == 94                          # SSD: 100 - 6 % wear
+    assert pct[1] == 79                          # 24 reallocated sectors, capped by "watch it"
+    assert pct[2] is not None and pct[2] <= 39   # at risk
+    assert pct[3] is None and pct[4] is None     # no data: no figure
+    from benchwise.diskhealth import amdraid
+    array = dict(disks[4], id=4)
+    m0 = amdraid.member_disk(array, {"index": 0, "model": "A", "nvme": True, "smart": nvme_blob(used=3)})
+    m1 = amdraid.member_disk(array, {"index": 1, "model": "B", "nvme": True, "smart": nvme_blob(used=10)})
+    assert verdict.health_percent(m0) == 97 and verdict.health_percent(m1) == 90
+    array["members"] = [m0, m1]
+    assert verdict.health_percent(array) == 90  # an array is as healthy as its worst member
+    assert verdict.health_percent(dict(m0, nvme=amdraid.parse_nvme(nvme_blob(spare=4)))) <= 10
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

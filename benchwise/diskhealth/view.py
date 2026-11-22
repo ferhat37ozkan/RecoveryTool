@@ -13,7 +13,7 @@ import customtkinter as ctk
 from recoverytool.i18n import t
 from recoverytool.model import human_size
 
-from .. import livemode, monitor, ui
+from .. import livemode, monitor, settings, ui
 from ..ui import BG, BORDER, CARD, CARD_HOVER, LEVEL, MUTED, TEXT
 from . import amdraid, data, verdict
 
@@ -187,6 +187,12 @@ class DiskHealthView(ctk.CTkFrame):
         for w in row.winfo_children():
             w.destroy()
         on = livemode.enabled()
+        seg = ctk.CTkSegmentedButton(row, values=[t("live_seconds", n=n) for n in monitor.INTERVALS],
+                                     command=self.set_interval, font=("Segoe UI", 11), height=26,
+                                     selected_color=ui.ACCENT, unselected_color=CARD)
+        seg.set(t("live_seconds", n=monitor.interval()))
+        seg.pack(side="right")                  # packed from the right: the buttons, then their label
+        ctk.CTkLabel(row, text=t("live_interval"), font=("Segoe UI", 12), text_color=MUTED).pack(side="right", padx=(0, 8))
         ctk.CTkLabel(row, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
                      text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
         if not livemode.supported():
@@ -239,6 +245,14 @@ class DiskHealthView(ctk.CTkFrame):
         self.render_live_row()
         return result["ok"]
 
+    def set_interval(self, label):
+        for n in monitor.INTERVALS:
+            if label == t("live_seconds", n=n):
+                settings.put("tray_interval", n)
+        shell = self.winfo_toplevel()
+        if hasattr(shell, "tray_changed"):
+            shell.tray_changed()
+
     def toggle_autostart(self):
         try:
             livemode.enable(start_with_windows=self.autostart_var.get())
@@ -258,6 +272,18 @@ class DiskHealthView(ctk.CTkFrame):
     def toggle_tray(self, key, var):
         keys = monitor.selected()
         d = next((x for x in self.disks if amdraid.disk_key(x) == key), None)
+        if d is not None and d.get("members"):
+            # ticking the array watches every disk inside it (the array itself has no temperature)
+            member_keys = [amdraid.disk_key(m) for m in d["members"]]
+            if var.get():
+                if not keys and livemode.supported() and not livemode.enabled():
+                    self.ask_live()
+                keys += [k for k in member_keys if k not in keys]
+            else:
+                keys = [k for k in keys if k not in member_keys]
+            monitor.set_selected(keys)
+            self.after_tray_change()
+            return
         if var.get() and d is not None and amdraid.is_amd_raid(d) and not d.get("members"):
             # the array itself reports no temperature: its disks can be watched once AMD_RC2t7 is set up
             var.set(False)
@@ -280,9 +306,24 @@ class DiskHealthView(ctk.CTkFrame):
         else:
             keys = [k for k in keys if k != key]
         monitor.set_selected(keys)
+        self.after_tray_change()
+
+    def after_tray_change(self):
+        """Tick boxes of arrays and members depend on each other: redraw the list, and tell the window."""
+        for w in self.listf.winfo_children():
+            w.destroy()
+        self.items = {}
+        for disk in self.disks:
+            self.disk_item(disk)
         shell = self.winfo_toplevel()
         if hasattr(shell, "tray_changed"):
             shell.tray_changed()
+
+    @staticmethod
+    def level_text(d, res):
+        pct = verdict.health_percent(d, res)
+        level = t("dh_level_" + res["level"])
+        return level if pct is None else t("dh_level_pct", level=level, pct=pct)
 
     def select_key(self, key):
         """Select the disk a clock icon stands for (now, or once the list has been read)."""
@@ -323,7 +364,11 @@ class DiskHealthView(ctk.CTkFrame):
         stripe = ctk.CTkFrame(item, fg_color=color, width=5, height=10, corner_radius=3)
         stripe.pack(side="left", fill="y", padx=(8, 0), pady=10)
         key = amdraid.disk_key(d)
-        var = tk.BooleanVar(value=key in monitor.selected())
+        chosen = monitor.selected()
+        if d.get("members"):                    # an array stands for all the disks in it
+            var = tk.BooleanVar(value=all(amdraid.disk_key(m) in chosen for m in d["members"]))
+        else:
+            var = tk.BooleanVar(value=key in chosen)
         side = ctk.CTkFrame(item, fg_color="transparent", width=64)
         side.pack(side="right", fill="y", padx=(0, 8), pady=8)
         temp = res["figures"].get("temperature")
@@ -344,7 +389,7 @@ class DiskHealthView(ctk.CTkFrame):
             bits.append(t("dh_system"))
         ctk.CTkLabel(box, text=" · ".join(b for b in bits if b), font=("Segoe UI", 11), text_color=MUTED,
                      anchor="w").pack(fill="x")
-        ctk.CTkLabel(box, text=t("dh_level_" + res["level"]), font=("Segoe UI Semibold", 12), text_color=color,
+        ctk.CTkLabel(box, text=self.level_text(d, res), font=("Segoe UI Semibold", 12), text_color=color,
                      anchor="w").pack(fill="x", pady=(2, 0))
 
         def pick(e, n=d["id"]):
@@ -415,7 +460,7 @@ class DiskHealthView(ctk.CTkFrame):
         ctk.CTkFrame(row, fg_color=color, width=8, height=56, corner_radius=4).pack(side="left", fill="y", padx=(0, 14))
         txt = ctk.CTkFrame(row, fg_color="transparent")
         txt.pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(txt, text=t("dh_level_" + res["level"]), font=("Segoe UI Semibold", 24), text_color=color,
+        ctk.CTkLabel(txt, text=self.level_text(d, res), font=("Segoe UI Semibold", 24), text_color=color,
                      anchor="w").pack(fill="x")
         ctk.CTkLabel(txt, text=t("dh_lead_" + res["level"]), font=("Segoe UI", 12), text_color=TEXT,
                      anchor="w").pack(fill="x")

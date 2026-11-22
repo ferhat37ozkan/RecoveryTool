@@ -9,9 +9,9 @@ ships as its own console executable, Benchwise-cli.exe (see run_cli.py).
 import sys
 
 args = sys.argv[1:]
-if len(args) == 3 and args[0] == "--amdrc2-helper":     # Disk Health: reads AMD RAID members, then exits
+if len(args) in (3, 5) and args[0] == "--amdrc2-helper":     # Disk Health: reads AMD RAID members
     from benchwise.diskhealth.amdraid import helper_main
-    helper_main(args[1], args[2])
+    helper_main(*args[1:])
     sys.exit(0)
 from benchwise.launch import is_window_start  # noqa: E402
 

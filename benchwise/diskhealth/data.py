@@ -158,3 +158,68 @@ def collect():
         d.setdefault("system", extra.get("system", False))
         result.append(d)
     return result
+
+
+# -- fast temperature readings (for the icons next to the clock) -----------------------------------
+_TEMP_LOOP = r"""
+param([int]$Parent, [double]$Interval)
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$ErrorActionPreference = 'SilentlyContinue'
+while ($true) {
+  if (-not (Get-Process -Id $Parent -ErrorAction SilentlyContinue)) { break }    # Benchwise is gone
+  $o = @{}
+  Get-PhysicalDisk | ForEach-Object { $o[[string]$_.DeviceId] = ($_ | Get-StorageReliabilityCounter).Temperature }
+  [Console]::Out.WriteLine((ConvertTo-Json -Compress -InputObject $o))
+  [Console]::Out.Flush()
+  Start-Sleep -Milliseconds ([int]($Interval * 1000))
+}
+"""
+
+
+class TempReader:
+    """One PowerShell that stays open and prints every disk's temperature every ``interval`` seconds
+    (starting PowerShell each time would cost far more than the reading).  It ends by itself when
+    Benchwise is gone.  ``temps``: {disk number: degrees or None}; ``time``: of the last reading."""
+
+    def __init__(self, interval):
+        import threading
+        self.temps, self.time, self.proc = {}, 0.0, None
+        self.interval = interval
+        self._start()
+        threading.Thread(target=self._read, name="temp-reader", daemon=True).start()
+
+    def _start(self):
+        script = "& {%s} %d %s" % (_TEMP_LOOP, os.getpid(), self.interval)
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        self.proc = subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                     creationflags=flags, text=True, encoding="utf-8", errors="replace")
+
+    def _read(self):
+        import time
+        while True:
+            proc = self.proc
+            line = proc.stdout.readline() if proc and proc.stdout else ""
+            if not line:
+                if self.proc is proc:           # it ended on its own (or was stopped): nothing more to read
+                    return
+                continue                        # restarted with another interval: read the new one
+            try:
+                raw = json.loads(line)
+            except ValueError:
+                continue
+            self.temps = {int(k): (v or None) for k, v in raw.items()}    # 0 means "not reported"
+            self.time = time.time()
+
+    def set_interval(self, interval):
+        if interval == self.interval:
+            return
+        self.interval = interval
+        old = self.proc
+        self._start()
+        old.terminate()                         # a plain PowerShell loop: safe to stop
+
+    def stop(self):
+        proc, self.proc = self.proc, None
+        if proc:
+            proc.terminate()

@@ -17,6 +17,15 @@ Added
 - **In-app update.** "Download and install" in the update panel downloads the release's Benchwise.exe
   with a progress bar, checks its size and SHA-256 against the release, replaces the running exe and
   restarts.
+- **Temperatures every 15 seconds** by default (5 / 15 / 30 / 60 s to choose in Disk Health; Hard Disk
+  Sentinel's default is 5 minutes). Two readers stay open instead of starting a process each time: one
+  PowerShell for the disks Windows sees and the AMD RAID helper, which keeps the library loaded. Both end
+  by themselves when Benchwise ends (the helper is never killed). The full health reading runs every
+  5 minutes.
+- **Health percentage** in Disk Health and in the clock tooltips ("Healthy · 94 %"): SSDs from the wear
+  they report and their spare blocks, hard disks from reallocated, pending and uncorrectable sectors;
+  never higher than the verdict allows. An array shows its worst member.
+- Ticking an AMD RAID array for the clock ticks every disk inside it (unticking removes them all).
 - One Benchwise at a time: a second start brings the running window to the front.
 - Ticking a disk that reports no temperature (most USB enclosures) warns that it would show "?" and asks first.
 - Ticking an AMD RAID array for the clock first offers to set up AMD_RC2t7 (the array reports no

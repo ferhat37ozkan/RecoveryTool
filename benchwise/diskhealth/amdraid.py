@@ -152,8 +152,31 @@ def download(progress=lambda step, done=0, total=0: None):
 
 
 # -- reading (in the helper process) -----------------------------------------------------------
-def helper_main(dll, out):
-    """Entry of ``--amdrc2-helper <dll> <out.json>``: read every member disk, write JSON, exit."""
+def _parent_alive(pid):
+    """Is the process ``pid`` still running?  (The watching helper ends itself when Benchwise is gone.)"""
+    k32 = ctypes.windll.kernel32
+    h = k32.OpenProcess(0x00100000, False, int(pid))          # SYNCHRONIZE
+    if not h:
+        return False
+    try:
+        return k32.WaitForSingleObject(h, 0) == 0x102            # WAIT_TIMEOUT: still running
+    finally:
+        k32.CloseHandle(h)
+
+
+def _write_json(out, result):
+    tmp = out + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(result, f)
+    os.replace(tmp, out)
+
+
+def helper_main(dll, out, interval=None, parent=None):
+    """Entry of ``--amdrc2-helper <dll> <out.json> [<seconds> <parent pid>]``.
+
+    Without the last two: read every member disk once, write JSON, exit.  With them: keep the
+    library loaded and write a fresh reading every ``seconds`` until the parent process is gone,
+    then return normally (the library is unloaded the regular way, never killed)."""
     result = {}
     try:
         if sha256(dll) != DLL_SHA256[os.path.basename(dll)]:
@@ -176,7 +199,7 @@ def helper_main(dll, out):
         lib.AMD_RC2_GetSmartData.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_int]
         status = lib.AMD_RC2_Init()
         result["status"] = STATUS.get(status, str(status))
-        disks = []
+        found = []                           # identify data, read once
         if status == 1:
             for i in range(min(lib.AMD_RC2_GetDrives(), 128)):
                 idn = Identify()
@@ -184,24 +207,98 @@ def helper_main(dll, out):
                 if not lib.AMD_RC2_GetIdentify(ctypes.byref(idn)):
                     continue
                 txt = lambda b: b.decode("ascii", "replace").strip()
-                entry = {"index": i, "model": txt(idn.sModel), "serial": txt(idn.sSerialNumber),
-                         "firmware": txt(idn.sFirmwareRev), "speed": txt(idn.sSpeed), "size": idn.uDriveSize64,
-                         "ssd": bool(idn.isSSD), "nvme": bool(idn.isNVMe)}
+                found.append({"index": i, "model": txt(idn.sModel), "serial": txt(idn.sSerialNumber),
+                              "firmware": txt(idn.sFirmwareRev), "speed": txt(idn.sSpeed), "size": idn.uDriveSize64,
+                              "ssd": bool(idn.isSSD), "nvme": bool(idn.isNVMe)})
+
+        def read():
+            disks = []
+            for base in found:
+                entry = dict(base)
                 data, thr = (ctypes.c_ubyte * 512)(), (ctypes.c_ubyte * 512)()
-                if lib.AMD_RC2_GetSmartData(i, data, 512, thr, 512):
+                if lib.AMD_RC2_GetSmartData(entry["index"], data, 512, thr, 512):
                     entry["smart"] = base64.b64encode(bytes(data)).decode()
                     entry["thresholds"] = base64.b64encode(bytes(thr)).decode()
                 disks.append(entry)
-        result["disks"] = disks
+            return disks
+        result["disks"] = read() if status == 1 else []
+        result["time"] = time.time()
+        _write_json(out, result)
+        if status != 1 or not interval:
+            return
+        while parent and _parent_alive(parent):
+            try:                             # Benchwise may change the interval while we run
+                with open(out + ".interval") as f:
+                    interval = float(f.read().strip() or interval)
+            except (OSError, ValueError):
+                pass
+            time.sleep(max(2.0, float(interval)))
+            if not _parent_alive(parent):
+                break
+            result = {"status": result["status"], "disks": read(), "time": time.time()}
+            _write_json(out, result)
+        return
     except Exception as ex:                  # reported back; the main program shows it
         result["error"] = str(ex)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(result, f)
+    _write_json(out, result)
+
+
+class Watcher:
+    """A helper process that keeps the library loaded and writes a reading every ``interval`` s.
+    It ends by itself (normally) when Benchwise is gone; Benchwise never kills it."""
+
+    def __init__(self, interval):
+        fd, self.out = tempfile.mkstemp(prefix="benchwise-amdrc2-watch-", suffix=".json")
+        os.close(fd)
+        os.remove(self.out)
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        self.proc = subprocess.Popen([sys.executable, "--amdrc2-helper", dll_path(), self.out, str(interval),
+                                      str(os.getpid())], creationflags=flags, stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.interval = interval
+
+    def set_interval(self, interval):
+        """The helper reads this before each pause (it is never restarted or stopped from outside)."""
+        with open(self.out + ".interval", "w") as f:
+            f.write(str(interval))
+        self.interval = interval
+
+    def alive(self):
+        return self.proc.poll() is None
+
+    def latest(self):
+        """``(members, error, time)`` of the newest reading, or None before the first one."""
+        try:
+            with open(self.out, encoding="utf-8") as f:
+                res = json.load(f)
+        except (OSError, ValueError):
+            return None
+        if res.get("error") or res.get("status") != "loaded":
+            return [], res.get("error") or res.get("status") or "?", res.get("time", 0)
+        return res.get("disks", []), None, res.get("time", 0)
+
+
+_watcher = None
+
+
+def watch(interval):
+    """Start (or restart with a new interval) the watching helper; returns it.  The library must be set up."""
+    global _watcher
+    if _watcher is not None and _watcher.alive():
+        if _watcher.interval != interval:
+            _watcher.set_interval(interval)
+        return _watcher
+    _watcher = Watcher(interval)
+    return _watcher
 
 
 def read_members():
     """Ask the helper process for the member disks.  Returns ``(members, error)``."""
     global _running
+    if _watcher is not None and _watcher.alive():      # never two processes on the library at once
+        got = _watcher.latest()
+        if got is not None:
+            return got[0], got[1]
     if _running is not None and _running.poll() is None:
         return [], "still_running"
     exe = sys.executable
