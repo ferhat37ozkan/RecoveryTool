@@ -92,7 +92,7 @@ CATEGORIES = [
         Tool("network.netdiag", "route", view=_tool("netdiag")),
         Tool("network.netspeed", "gauge", view=_tool("netspeed")),
         Tool("network.wifi", "wifi", view=_tool("wifi")),
-        Tool("network.netreset", "refresh", admin=True),
+        Tool("network.netreset", "refresh", admin=True, view=_tool("netreset")),
     ]),
     Category("windows", "windows", [
         Tool("windows.sfc", "shield", admin=True),
