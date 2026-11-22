@@ -110,6 +110,7 @@ i18n.STRINGS.update({
                       "Başka bir engel aşma aracı çalışıyor ({name}). Önce onu kapatın."),
     "ps_fail_error": ("Passage could not be switched: {err}", "Geçit değiştirilemedi: {err}"),
     "ps_tray": ("Passage: {state}", "Geçit: {state}"),
+    "ps_show_tray": ("Show the Passage icon next to the clock", "Geçit simgesini saatin yanında göster"),
     "ps_tray_hint": ("Right-click to switch", "Açıp kapatmak için sağ tıklayın"),
     "ps_now": ("Now: {state}", "Şu an: {state}"),
     "ps_info": ("Passage opens sites and apps blocked in Turkey, without a VPN and without slowing "

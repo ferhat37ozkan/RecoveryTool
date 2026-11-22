@@ -21,7 +21,7 @@ import customtkinter as ctk
 from recoverytool import i18n
 from recoverytool.i18n import t
 
-from . import APP_NAME, DOMAIN, NAME, __version__, art, elevate, strings  # noqa: F401  (strings fills the table)
+from . import APP_NAME, DOMAIN, NAME, __version__, art, elevate, settings, strings  # noqa: F401  (strings fills the table)
 from .registry import CATEGORIES, find_tool
 
 from .ui import ACCENT, BG, BORDER, CARD, CARD_HOVER, GOOD, MUTED, TEXT, WARN
@@ -470,8 +470,36 @@ class Shell(ctk.CTk):
         self.after(400, self.passage_poll)
 
     def passage_info(self):
+        """What Passage does, its state now, and whether its icon sits next to the clock."""
         from . import passage
-        messagebox.showinfo(t("ps_name"), t("ps_info") + "\n\n" + t("ps_now", state=passage.summary()))
+        old = getattr(self, "passage_dialog", None)
+        if old is not None and old.winfo_exists():
+            return old.focus_force()
+        win = self.passage_dialog = ctk.CTkToplevel(self, fg_color=BG)
+        win.title(t("ps_name"))
+        win.resizable(False, False)
+        win.transient(self)
+        box = ctk.CTkFrame(win, fg_color=BG)
+        box.pack(fill="both", expand=True, padx=22, pady=18)
+        ctk.CTkLabel(box, text=t("ps_name"), font=("Segoe UI Semibold", 20), text_color=TEXT, anchor="w").pack(fill="x")
+        ctk.CTkLabel(box, text=t("ps_now", state=passage.summary()), font=("Segoe UI Semibold", 12),
+                     text_color=GOOD if self.passage_on else MUTED, anchor="w").pack(fill="x", pady=(2, 12))
+        ctk.CTkLabel(box, text=t("ps_info"), font=("Segoe UI", 12), text_color=TEXT, anchor="w", justify="left",
+                     wraplength=460).pack(fill="x")
+        tray_var = tk.BooleanVar(value=settings.get("passage_tray", True))
+
+        def tray_changed():
+            settings.put("passage_tray", bool(tray_var.get()))
+            self.tray_version = -1
+        ctk.CTkCheckBox(box, text=t("ps_show_tray"), variable=tray_var, command=tray_changed,
+                        font=("Segoe UI", 12), text_color=TEXT, checkbox_width=18, checkbox_height=18).pack(
+            anchor="w", pady=(16, 4))
+        ctk.CTkButton(box, text=t("tc_close"), width=100, command=win.destroy, fg_color=ACCENT).pack(
+            anchor="e", pady=(10, 0))
+        win.update_idletasks()
+        x = self.winfo_rootx() + self.winfo_width() - win.winfo_reqwidth() - 40
+        win.geometry("+%d+%d" % (max(x, 0), self.winfo_rooty() + 60))
+        win.after(50, win.focus_force)
 
     # -- language and closing -------------------------------------------------------------------
     def switch_language(self):
@@ -507,7 +535,8 @@ class Shell(ctk.CTk):
                 self.tray_version = -1
             if self.monitor.version != self.tray_version:
                 self.tray_version = self.monitor.version
-                self.tray.set_icons([self.app_tray_icon(), self.passage_tray_icon()] + self.monitor.icons())
+                shown = [self.passage_tray_icon()] if settings.get("passage_tray", True) else []
+                self.tray.set_icons([self.app_tray_icon()] + shown + self.monitor.icons())
                 if not self.promoted and self.tray_version > 0:
                     self.promoted = True
                     self.after(1500, lambda: tray.promote_icons(_icon_exe()))
