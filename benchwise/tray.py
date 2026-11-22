@@ -143,6 +143,42 @@ def hicon_from_image(img):
     return icon
 
 
+# The window class is registered once per process and stays registered after a Tray stops, so its
+# window procedure must not belong to one Tray: a second Tray (icons turned off, then on again)
+# would otherwise get the first one's procedure and never handle its own requests.  The single
+# procedure below hands each message to the Tray that owns the window.
+CLASS_NAME = "BenchwiseTrayWindow"
+_windows = {}                   # hwnd -> Tray
+_class_lock = threading.Lock()
+_class_proc = None
+_taskbar_msg = None
+
+
+def _taskbar_created():
+    global _taskbar_msg
+    if _taskbar_msg is None:
+        _taskbar_msg = user32.RegisterWindowMessageW("TaskbarCreated")
+    return _taskbar_msg
+
+
+def _dispatch(hwnd, msg, wparam, lparam):
+    owner = _windows.get(hwnd)
+    if owner is None:                               # while the window is being created or after it is gone
+        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+    return owner._handle(hwnd, msg, wparam, lparam)
+
+
+def _register_class(hinst):
+    global _class_proc
+    with _class_lock:
+        if _class_proc is not None:
+            return
+        _class_proc = WNDPROC(_dispatch)            # kept for the life of the process: called from C
+        cls = WNDCLASSW()
+        cls.lpfnWndProc, cls.hInstance, cls.lpszClassName = _class_proc, hinst, CLASS_NAME
+        user32.RegisterClassW(ctypes.byref(cls))
+
+
 class Tray:
     """Icons next to the clock.  ``events`` gets ("click", key), ("open", None), ("passage", None)
     and ("quit", None).  The Passage line shows only when ``passage`` is set: (label, checked)."""
@@ -239,35 +275,31 @@ class Tray:
         elif cmd == self.MENU_PASSAGE:
             self.events.put(("passage", None))
 
+    def _handle(self, hwnd, msg, wparam, lparam):
+        if msg == CALLBACK:
+            event = lparam & 0xFFFF
+            if event in (WM_LBUTTONUP, WM_LBUTTONDBLCLK):
+                self.events.put(("click", self._key_of(wparam)))
+            elif event == WM_RBUTTONUP:
+                self._menu()
+            return 0
+        if msg == WAKE:
+            self._drain()
+            return 0
+        if msg == _taskbar_created() and msg:
+            self._readd()
+            return 0
+        if msg == WM_DESTROY:
+            _windows.pop(hwnd, None)
+            user32.PostQuitMessage(0)
+            return 0
+        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
     def _run(self):
-        taskbar_created = user32.RegisterWindowMessageW("TaskbarCreated")
-
-        def proc(hwnd, msg, wparam, lparam):
-            if msg == CALLBACK:
-                event = lparam & 0xFFFF
-                if event in (WM_LBUTTONUP, WM_LBUTTONDBLCLK):
-                    self.events.put(("click", self._key_of(wparam)))
-                elif event == WM_RBUTTONUP:
-                    self._menu()
-                return 0
-            if msg == WAKE:
-                self._drain()
-                return 0
-            if msg == taskbar_created and taskbar_created:
-                self._readd()
-                return 0
-            if msg == WM_DESTROY:
-                user32.PostQuitMessage(0)
-                return 0
-            return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
-
-        self._proc = WNDPROC(proc)                                  # keep a reference: called from C
         hinst = kernel32.GetModuleHandleW(None)
-        cls = WNDCLASSW()
-        cls.lpfnWndProc, cls.hInstance, cls.lpszClassName = self._proc, hinst, "BenchwiseTrayWindow"
-        user32.RegisterClassW(ctypes.byref(cls))
-        self.hwnd = user32.CreateWindowExW(0, "BenchwiseTrayWindow", "Benchwise tray", 0, 0, 0, 0, 0, None, None,
-                                           hinst, None)
+        _register_class(hinst)
+        self.hwnd = user32.CreateWindowExW(0, CLASS_NAME, "Benchwise tray", 0, 0, 0, 0, 0, None, None, hinst, None)
+        _windows[self.hwnd] = self
         self.ready.set()
         self._drain()
         msg = w.MSG()

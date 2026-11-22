@@ -64,6 +64,24 @@ def test_custom_colours():
     assert broken.size == (32, 32)
 
 
+def test_tray_again():
+    """Icons turned off and on again: the new tray must handle its own requests (no icon is added)."""
+    import time
+    from benchwise import tray
+    first = tray.Tray()
+    first.stop()
+    for _ in range(2):
+        again = tray.Tray()
+        again.set_icons([])
+        deadline = time.time() + 3
+        while again.requests.qsize() and time.time() < deadline:
+            time.sleep(0.05)
+        assert again.requests.qsize() == 0, "a second tray did not handle its requests"
+        again.stop()
+        assert not again.thread.is_alive()
+    assert first is not None                        # the first one is still in memory, as in the app
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
