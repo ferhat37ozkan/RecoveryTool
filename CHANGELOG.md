@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.3.1
+
+Fixed
+
+- Icons next to the clock came back only after a restart once they had all been removed (the last
+  watched disk unticked): a tray made again got the first one's window procedure and never handled
+  its own requests. The window class now has one procedure that hands each message to its tray.
+
 ## 1.3.0
 
 Added
