@@ -29,6 +29,9 @@ TOOL_W, TOOL_H = 250, 190            # tool cards
 GAP = 16
 
 
+APP_TRAY_KEY = "benchwise"           # key of the program's own icon next to the clock
+
+
 def resource(name):
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(base, "assets", name)
@@ -122,6 +125,7 @@ class Shell(ctk.CTk):
         self.tray_version = -1
         self.promoted = False
         self.told_hidden = False
+        self.app_icon_image = None
         self.show_asked = []        # set from another thread when a second start asks to be shown
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.bind("<Destroy>", lambda e: self.stop_tray() if e.widget is self else None)
@@ -408,7 +412,7 @@ class Shell(ctk.CTk):
                 self.tray = tray.Tray((t("tray_open"), t("tray_quit")))
             if self.monitor.version != self.tray_version:
                 self.tray_version = self.monitor.version
-                self.tray.set_icons(self.monitor.icons())
+                self.tray.set_icons([self.app_tray_icon()] + self.monitor.icons())
                 if not self.promoted and self.tray_version > 0:
                     self.promoted = True
                     self.after(1500, lambda: tray.promote_icons(_icon_exe()))
@@ -428,11 +432,25 @@ class Shell(ctk.CTk):
             if kind == "quit":
                 return self.quit_app()
             self.show_window()
-            if kind == "click" and key:
+            if kind == "click" and key == APP_TRAY_KEY:
+                if not self.busy_views():
+                    self.go_home()
+            elif kind == "click" and key:
                 self.open_tool_id("disk.health")
                 view = self.views.get("disk.health")
                 if view is not None and hasattr(view, "select_key"):
                     view.select_key(key)
+
+    def app_tray_icon(self):
+        """Benchwise's own icon, first next to the clock: a click opens the main screen."""
+        if self.app_icon_image is None:
+            from PIL import Image
+            try:
+                with Image.open(resource("icon.ico")) as ico:
+                    self.app_icon_image = ico.convert("RGBA").resize((32, 32), Image.LANCZOS)
+            except OSError:
+                self.app_icon_image = Image.new("RGBA", (32, 32), ACCENT)
+        return {"key": APP_TRAY_KEY, "image": self.app_icon_image, "tip": t("tray_app_tip")}
 
     def tray_changed(self):
         """The chosen disks changed (Disk Health): read now instead of in up to 30 seconds."""

@@ -251,9 +251,11 @@ i18n.STRINGS.update({
     "live_seconds": ("{n} s", "{n} sn"),
     "tray_health": ("Health: {level} · click to open", "Sağlık: {level} · açmak için tıklayın"),
     "tray_hidden_title": ("Benchwise keeps watching", "Benchwise izlemeye devam ediyor"),
-    "tray_hidden_body": ("The disk temperatures stay next to the clock. Click one to open Benchwise; right-click "
-                         "it to quit.", "Disk sıcaklıkları saatin yanında kalıyor. Benchwise'ı açmak için birine "
-                         "tıklayın; kapatmak için sağ tıklayın."),
+    "tray_hidden_body": ("Benchwise and the disk temperatures stay next to the clock. Click the Benchwise icon to "
+                         "open it; right-click it to quit.", "Benchwise ve disk sıcaklıkları saatin yanında kalıyor. "
+                         "Açmak için Benchwise simgesine tıklayın; kapatmak için sağ tıklayın."),
+    "tray_app_tip": ("Benchwise · click to open, right-click to quit",
+                     "Benchwise · açmak için tıklayın, kapatmak için sağ tıklayın"),
     "live_on": ("Live monitoring: on (always administrator)", "Canlı takip: açık (sürekli yönetici)"),
     "live_off": ("Live monitoring: off", "Canlı takip: kapalı"),
     "live_source_only": ("(only in Benchwise.exe)", "(yalnızca Benchwise.exe'de)"),
