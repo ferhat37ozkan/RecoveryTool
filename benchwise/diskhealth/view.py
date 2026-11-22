@@ -183,30 +183,35 @@ class DiskHealthView(ctk.CTkFrame):
 
     # -- next to the clock ----------------------------------------------------------------------
     def render_live_row(self):
+        """Two lines, so nothing is pushed out when the window is narrow: live monitoring on the first,
+        the clock icons (colours, refresh interval) on the second."""
         row = self.live_row
         for w in row.winfo_children():
             w.destroy()
+        line1 = ctk.CTkFrame(row, fg_color="transparent")
+        line1.pack(fill="x")
+        line2 = ctk.CTkFrame(row, fg_color="transparent")
+        line2.pack(fill="x", pady=(6, 0))
         on = livemode.enabled()
-        seg = ctk.CTkSegmentedButton(row, values=[t("live_seconds", n=n) for n in monitor.INTERVALS],
+        ctk.CTkLabel(line1, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
+                     text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
+        if not livemode.supported():
+            ctk.CTkLabel(line1, text="  " + t("live_source_only"), font=("Segoe UI", 11), text_color=MUTED).pack(side="left")
+        elif on:
+            self.autostart_var = tk.BooleanVar(value=livemode.autostart())
+            ctk.CTkCheckBox(line1, text=t("live_autostart"), variable=self.autostart_var, command=self.toggle_autostart,
+                            font=("Segoe UI", 12), text_color=TEXT, checkbox_width=18, checkbox_height=18,
+                            border_width=2, fg_color=ui.ACCENT, border_color=MUTED).pack(side="left", padx=(16, 0))
+            ui.button(line1, t("live_turn_off"), self.turn_live_off, 110).pack(side="left", padx=(12, 0))
+        else:
+            ui.button(line1, t("live_turn_on"), lambda: self.ask_live(), 170).pack(side="left", padx=(12, 0))
+        ui.button(line2, t("tc_button"), self.open_colors, 130).pack(side="left")
+        ctk.CTkLabel(line2, text=t("live_interval"), font=("Segoe UI", 12), text_color=MUTED).pack(side="left", padx=(16, 8))
+        seg = ctk.CTkSegmentedButton(line2, values=[t("live_seconds", n=n) for n in monitor.INTERVALS],
                                      command=self.set_interval, font=("Segoe UI", 11), height=26,
                                      selected_color=ui.ACCENT, unselected_color=CARD)
         seg.set(t("live_seconds", n=monitor.interval()))
-        seg.pack(side="right")                  # packed from the right: the buttons, then their label
-        ctk.CTkLabel(row, text=t("live_interval"), font=("Segoe UI", 12), text_color=MUTED).pack(side="right", padx=(0, 8))
-        ui.button(row, t("tc_button"), self.open_colors, 130).pack(side="right", padx=(0, 16))
-        ctk.CTkLabel(row, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
-                     text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
-        if not livemode.supported():
-            ctk.CTkLabel(row, text="  " + t("live_source_only"), font=("Segoe UI", 11), text_color=MUTED).pack(side="left")
-            return
-        if on:
-            self.autostart_var = tk.BooleanVar(value=livemode.autostart())
-            ctk.CTkCheckBox(row, text=t("live_autostart"), variable=self.autostart_var, command=self.toggle_autostart,
-                            font=("Segoe UI", 12), text_color=TEXT, checkbox_width=18, checkbox_height=18,
-                            border_width=2, fg_color=ui.ACCENT, border_color=MUTED).pack(side="left", padx=(16, 0))
-            ui.button(row, t("live_turn_off"), self.turn_live_off, 150).pack(side="left", padx=(12, 0))
-        else:
-            ui.button(row, t("live_turn_on"), lambda: self.ask_live(), 170).pack(side="left", padx=(12, 0))
+        seg.pack(side="left")
 
     def ask_live(self):
         """One-time consent for the permanent administrator mode (and starting with Windows)."""
