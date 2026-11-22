@@ -32,6 +32,12 @@ def run_window(args):
         from . import monitor, passage
         if not monitor.selected() and not passage.is_on():
             return 0                            # started with Windows but nothing to show next to the clock
+        if "--tray" in args and not elevate.is_admin() and livemode.supported() and livemode.points_here():
+            # live mode is on: the elevated copy (which can read temperatures) sits next to the clock
+            instance.release()
+            if livemode.start_elevated(show=False):
+                return 0
+            instance.acquire()
     elif livemode.supported():
         cmd = livemode.task_command()                   # None: live mode is off
         if cmd is not None and elevate.is_admin():

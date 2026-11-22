@@ -31,6 +31,7 @@ GAP = 16
 
 
 APP_TRAY_KEY = "benchwise"           # key of the program's own icon next to the clock
+PASSAGE_TRAY_KEY = "passage"         # the Passage icon: grey off, orange switching, green on
 
 
 def resource(name):
@@ -109,6 +110,7 @@ class Shell(ctk.CTk):
         # Started at sign-in (hidden=True) it stays hidden: only the icons next to the clock.
         self.withdraw()
         self.start_hidden = hidden
+        self.in_tray = hidden       # the window is put away and lives next to the clock
         self.title("%s  v%s" % (APP_NAME, __version__))
         self.minsize(1000, 700)
         self.center(1180, 800)
@@ -433,6 +435,7 @@ class Shell(ctk.CTk):
             return self.passage_show()
         self.passage_busy = time.time()
         self.passage_want = want
+        self.tray_version = -1
         self.passage_show()
         if self.admin:
             threading.Thread(target=lambda: _quiet(passage.enable if want else passage.disable),
@@ -483,7 +486,8 @@ class Shell(ctk.CTk):
     # -- next to the clock ----------------------------------------------------------------------
     def tray_wanted(self):
         from . import monitor
-        return bool(monitor.selected()) or self.passage_on
+        # a window put away next to the clock always keeps its icons, or nothing could bring it back
+        return bool(monitor.selected()) or self.passage_on or bool(self.passage_busy) or self.in_tray
 
     def tick_tray(self):
         """Once a second: keep the icons in step with the chosen disks and the latest readings."""
@@ -502,7 +506,7 @@ class Shell(ctk.CTk):
                 self.tray_version = -1
             if self.monitor.version != self.tray_version:
                 self.tray_version = self.monitor.version
-                self.tray.set_icons([self.app_tray_icon()] + self.monitor.icons())
+                self.tray.set_icons([self.app_tray_icon(), self.passage_tray_icon()] + self.monitor.icons())
                 if not self.promoted and self.tray_version > 0:
                     self.promoted = True
                     self.after(1500, lambda: tray.promote_icons(_icon_exe()))
@@ -525,7 +529,7 @@ class Shell(ctk.CTk):
                 self.passage_toggle(not self.passage_on)
                 continue
             self.show_window()
-            if kind == "click" and key == APP_TRAY_KEY:
+            if kind == "click" and key in (APP_TRAY_KEY, PASSAGE_TRAY_KEY):
                 if not self.busy_views():
                     self.go_home()
             elif kind == "click" and key:
@@ -546,6 +550,26 @@ class Shell(ctk.CTk):
         tip = t("tray_app_tip") + "\n" + t("ps_tray", state=t("ps_on" if self.passage_on else "ps_off"))
         return {"key": APP_TRAY_KEY, "image": self.app_icon_image, "tip": tip}
 
+    def passage_tray_icon(self):
+        from . import passage_icon
+        state = "busy" if self.passage_busy else ("on" if self.passage_on else "off")
+        kind = getattr(self, "conn_kind", None)
+        if kind is None or time.time() - getattr(self, "conn_kind_time", 0) > 300:
+            self.conn_kind_time = time.time()           # Wi-Fi or Ethernet, looked up now and then in the background
+            def look():
+                k = passage_icon.connection_kind()
+                if k != self.conn_kind:
+                    self.conn_kind = k
+                    self.tray_version = -1
+            threading.Thread(target=look, daemon=True).start()
+            if kind is None:
+                self.conn_kind = kind = "ethernet"
+        key = (state, kind)
+        if getattr(self, "passage_icon_key", None) != key:
+            self.passage_icon_key, self.passage_icon_image = key, passage_icon.icon(state, kind)
+        tip = t("ps_tray", state=t("ps_busy" if state == "busy" else ("ps_on" if state == "on" else "ps_off")))
+        return {"key": PASSAGE_TRAY_KEY, "image": self.passage_icon_image, "tip": tip + "\n" + t("ps_tray_hint")}
+
     def tray_changed(self):
         """The chosen disks changed (Disk Health): read now instead of in up to 30 seconds."""
         if self.monitor is not None:
@@ -562,6 +586,7 @@ class Shell(ctk.CTk):
         self.promoted = False
 
     def show_window(self):
+        self.in_tray = False
         self.deiconify()
         self.state("normal")
         self.lift()
@@ -590,6 +615,7 @@ class Shell(ctk.CTk):
     def on_close(self):
         if self.tray is not None and self.tray_wanted():
             self.withdraw()         # keep watching the temperatures next to the clock
+            self.in_tray = True
             if not self.told_hidden:
                 self.told_hidden = True
                 self.tray.notify(t("tray_hidden_title"), t("tray_hidden_body"))
