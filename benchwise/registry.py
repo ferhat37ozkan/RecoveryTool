@@ -79,7 +79,7 @@ CATEGORIES = [
     ]),
     Category("power", "battery", [
         Tool("power.battery", "battery", view=_tool("battery")),
-        Tool("power.wake", "moon", admin=True),
+        Tool("power.wake", "moon", admin=True, view=_tool("wake")),
     ]),
     Category("display", "monitor", [
         Tool("display.pixels", "pixels", view=_tool("pixels")),
