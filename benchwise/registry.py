@@ -75,7 +75,7 @@ CATEGORIES = [
         Tool("system.sysinfo", "info", view=_tool("sysinfo")),
         Tool("system.memtest", "memory", admin=True, view=_tool("memtest")),
         Tool("system.crash", "bolt", admin=True, view=_tool("crash")),
-        Tool("system.stress", "flame"),
+        Tool("system.stress", "flame", view=_tool("stress")),
     ]),
     Category("power", "battery", [
         Tool("power.battery", "battery"),
