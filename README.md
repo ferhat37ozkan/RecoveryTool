@@ -5,11 +5,17 @@ Windows. The window shows categories as big cards (Disk, System & Memory, Batter
 Network, Windows Repair, Cleanup & Privacy); each holds its tools. Tools that need administrator rights are
 marked with a shield and ask for them only when you open one.
 
-The first tool, **File Recovery** (formerly RecoveryTool), gets files back from **formatted**, **deleted** or
-**invisible** disks with their **original names and folder structure**. The other tools are on the way;
-their cards say "Coming soon".
+Every category has working tools: disk health with live temperatures next to the clock, surface scan,
+speed test, imaging and partitions; system information, memory and stress tests, crash analysis; battery
+and sleep; display, keyboard, mouse, audio and camera tests; network diagnosis and speed test; Windows
+repair; junk files, duplicates and space analysis. The best known one, **File Recovery** (formerly
+RecoveryTool), gets files back from **formatted**, **deleted** or **invisible** disks with their
+**original names and folder structure**.
 
-The rest of this page describes File Recovery.
+**Passage**, the switch at the top right, opens sites and apps that are blocked in Türkiye without a VPN
+([see below](#passage)).
+
+Most of the rest of this page describes File Recovery.
 
 [Türkçe açıklama aşağıda](#türkçe)
 
@@ -280,6 +286,42 @@ contents). Please do not attach disk images that contain personal data.
 To work on the interface without touching any disk, point `RECOVERYTOOL_FAKE_DISKS` at
 `docs\demo-disks.json`; see [BUILDING.md](BUILDING.md).
 
+## Passage
+
+A switch at the top right of the window (and in the menu of the Benchwise icon next to the clock) opens
+sites and apps that are blocked in Türkiye, without a VPN and without slowing anything else down.
+Blocks come in two layers, and Passage answers them one at a time, stopping at the first that is enough:
+
+1. **Encrypted DNS.** Most blocks are DNS answers that point to the provider's warning page. Passage
+   sets the connected network adapters to Cloudflare DNS (1.1.1.1) and turns on Windows' own DNS over
+   HTTPS for them, so the provider can neither read nor change the answers. Nothing is installed. If a
+   network refuses encrypted DNS, plain Cloudflare DNS is used and Passage says so.
+2. **Packet engine**, only if layer 1 is not enough. Where the provider also reads the site name inside
+   the connection (SNI), Passage runs [zapret](https://github.com/bol-van/zapret)'s `winws` as the Windows
+   service `BenchwisePassage`. It reshapes only the packets of the affected sites (fake and split packets)
+   so the provider's filter cannot match them, voice chat included. Presets for providers in Türkiye are
+   tried in turn and the first that gets through is kept. zapret is downloaded once, on demand, from its
+   official GitHub release (SHA-256 checked) into `%ProgramData%\Benchwise\Passage`, which standard users
+   can read but not change, because the service runs as SYSTEM.
+
+- **Stays on** after a restart (adapter settings and an automatic service); Benchwise starts next to the
+  clock at sign-in.
+- **Switching it off puts everything back**: the previous DNS settings of every adapter are restored
+  exactly and the service is removed. Programs that were already open may keep their existing
+  connection until they are restarted.
+- **Its own icon next to the clock** in the shape of the connection (Wi-Fi or Ethernet): grey off, orange
+  while switching, green on. Right-click it to switch. Click the name "Passage" in the window to hide it.
+- **Command line**: `Benchwise-cli.exe --hideme` switches it on (administrator terminal), `--hideme off`
+  switches it off, `--hideme status` prints the state. `Benchwise.exe --hideme` does the same without a
+  window and asks for administrator rights once.
+- Changing network settings needs administrator rights; Benchwise asks with one UAC prompt.
+
+The approach builds on [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI),
+[GoodbyeDPI-Turkey](https://github.com/cagritaskn/GoodbyeDPI-Turkey) and
+[SplitWire-Turkey](https://github.com/cagritaskn/SplitWire-Turkey). Third-party components and their
+licences: zapret (MIT), WinDivert (LGPL-3.0), cygwin1.dll (LGPL-3.0); they are downloaded unchanged
+from their publishers and are not part of Benchwise. Use Passage in line with the laws that apply to you.
+
 ## Disclaimer and license
 
 MIT License, see [LICENSE](LICENSE). The software is provided without warranty. It never writes
@@ -295,11 +337,17 @@ tezgâhı. Pencere kategorileri büyük kartlar halinde gösterir (Disk, Sistem 
 Giriş, Ağ, Windows Onarımı, Temizlik ve Gizlilik); her kategorinin içinde kendi araçları vardır. Yönetici
 yetkisi isteyen araçlar kalkanla işaretlidir ve yetkiyi yalnızca açıldıklarında sorar.
 
-İlk araç **Dosya Kurtarma** (eski adıyla RecoveryTool), **biçimlendirilmiş**, **silinmiş** veya Windows'ta
-**görünmeyen** disklerdeki dosyaları **özgün adları ve klasör yapısıyla** geri getirir. Diğer araçlar yolda;
-kartlarında "Yakında" yazar.
+Her kategoride çalışan araçlar var: saatin yanında canlı sıcaklıkla disk sağlığı, yüzey taraması, hız
+testi, imaj alma ve bölümler; sistem bilgisi, bellek ve stres testleri, çökme analizi; pil ve uyku; ekran,
+klavye, fare, ses ve kamera testleri; ağ tanılama ve hız testi; Windows onarımı; gereksiz dosyalar, kopya
+dosyalar ve alan analizi. En bilineni **Dosya Kurtarma** (eski adıyla RecoveryTool),
+**biçimlendirilmiş**, **silinmiş** veya Windows'ta **görünmeyen** disklerdeki dosyaları **özgün adları ve
+klasör yapısıyla** geri getirir.
 
-Bu sayfanın geri kalanı Dosya Kurtarma'yı anlatır.
+Sağ üstteki **Geçit** anahtarı, Türkiye'de engellenen site ve uygulamaları VPN olmadan açar
+([aşağıda](#geçit)).
+
+Bu sayfanın geri kalanının çoğu Dosya Kurtarma'yı anlatır.
 
 ## Neler yapar
 
@@ -416,6 +464,42 @@ olduğunu ve yazılımla düzeltilemeyeceğini açıkça söyler.
 - Sağ tık menüsündeki disk işlemleri ve sorun gidericinin düzeltmeleri gerçek donanımda henüz
   denenmedi; standart Windows depolama komutlarını çağırırlar.
 - Fiziksel arızalı diskler profesyonel laboratuvar işidir. Disk tıkırdıyor ya da kayboluyorsa durun.
+
+## Geçit
+
+Pencerenin sağ üstündeki anahtar (ve saatin yanındaki Benchwise simgesinin menüsü), Türkiye'de engellenen
+site ve uygulamaları VPN olmadan, başka hiçbir şeyi yavaşlatmadan açar. Engeller iki katmanlıdır; Geçit
+bunlara sırayla cevap verir ve yeten ilk katmanda durur:
+
+1. **Şifreli DNS.** Engellerin çoğu, siteyi servis sağlayıcının uyarı sayfasına yönlendiren DNS
+   cevaplarıdır. Geçit bağlı ağ kartlarını Cloudflare DNS'e (1.1.1.1) çevirir ve Windows'un kendi şifreli
+   DNS'ini (DNS over HTTPS) açar; sağlayıcı cevapları ne okuyabilir ne değiştirebilir. Hiçbir şey kurulmaz.
+   Ağ şifreli DNS'e izin vermezse şifresiz Cloudflare DNS kullanılır ve Geçit bunu söyler.
+2. **Paket motoru**, yalnızca 1. katman yetmezse. Sağlayıcı bağlantının içindeki site adını da (SNI)
+   okuyorsa Geçit, [zapret](https://github.com/bol-van/zapret)'in `winws` programını `BenchwisePassage`
+   adlı Windows hizmeti olarak çalıştırır. Yalnızca ilgili sitelere giden paketlerin şeklini değiştirir
+   (sahte ve bölünmüş paketler), sağlayıcının filtresi onları tanıyamaz; sesli sohbet de dahildir.
+   Türkiye'deki servis sağlayıcıları için hazır ayarlar sırayla denenir, engeli aşan ilk ayar kalır.
+   zapret yalnızca gerektiğinde, resmi GitHub sürümünden bir kez indirilir (SHA-256 kontrollü) ve
+   `%ProgramData%\Benchwise\Passage` klasörüne konur; hizmet SYSTEM olarak çalıştığı için standart
+   kullanıcılar bu klasörü okuyabilir ama değiştiremez.
+
+- Bilgisayar yeniden başlasa da **açık kalır**; Benchwise oturum açılışında saatin yanında başlar.
+- **Kapatınca her şey geri gelir**: her ağ kartının önceki DNS ayarları aynen geri yüklenir, hizmet
+  kaldırılır. Zaten açık olan programlar, yeniden başlatılana kadar mevcut bağlantılarını kullanabilir.
+- **Saatin yanında kendi simgesi** bağlantının şeklindedir (Wi-Fi ya da Ethernet): gri kapalı, turuncu
+  geçiş sırasında, yeşil açık. Sağ tıkla açılıp kapanır. Gizlemek için penceredeki "Geçit" yazısına
+  tıklayın.
+- **Komut satırı**: `Benchwise-cli.exe --hideme` açar (yönetici terminali), `--hideme off` kapatır,
+  `--hideme status` durumu yazar. `Benchwise.exe --hideme` aynı işi pencere açmadan yapar ve bir kez
+  yönetici izni ister.
+- Ağ ayarlarını değiştirmek yönetici yetkisi ister; Benchwise tek bir UAC sorusuyla ister.
+
+Yaklaşım [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI),
+[GoodbyeDPI-Turkey](https://github.com/cagritaskn/GoodbyeDPI-Turkey) ve
+[SplitWire-Turkey](https://github.com/cagritaskn/SplitWire-Turkey) projelerine dayanır. Üçüncü taraf
+bileşenler ve lisansları: zapret (MIT), WinDivert (LGPL-3.0), cygwin1.dll (LGPL-3.0); yayıncılarından
+değiştirilmeden indirilir, Benchwise'ın parçası değildir. Geçit'i size uygulanan yasalara uygun kullanın.
 
 ## Kaynaktan çalıştırma ve derleme
 

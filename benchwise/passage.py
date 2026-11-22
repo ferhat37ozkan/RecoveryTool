@@ -1,6 +1,6 @@
-"""Passage (Geçit): opens sites and apps that are blocked in Turkey, without a VPN.
+"""Passage (Geçit): opens sites and apps that are blocked in Türkiye, without a VPN.
 
-Blocks in Turkey come in two layers, and Passage answers them one at a time, stopping at the first
+Blocks in Türkiye come in two layers, and Passage answers them one at a time, stopping at the first
 that is enough (so most PCs never get a driver):
 
 1. **DNS.**  The ISP's DNS answers a blocked name with the address of its warning page.  Passage
@@ -10,7 +10,7 @@ that is enough (so most PCs never get a driver):
 2. **DPI.**  Where the ISP also reads the site name in the first packet of a connection (SNI), Passage
    runs zapret's ``winws`` as a Windows service (``BenchwisePassage``).  winws reshapes only the
    packets of the listed sites (fake packets, split packets) so the ISP's filter cannot match them,
-   and handles voice chat (UDP) too.  Presets for Turkish ISPs are tried in turn and the first
+   and handles voice chat (UDP) too.  Presets for ISPs in Türkiye are tried in turn and the first
    one that gets through is kept.  zapret is downloaded once from its official GitHub release
    (SHA-256 checked) into %ProgramData%\\Benchwise\\Passage, readable but not writable for
    standard users, since the service runs as SYSTEM.
@@ -113,7 +113,7 @@ i18n.STRINGS.update({
     "ps_show_tray": ("Show the Passage icon next to the clock", "Geçit simgesini saatin yanında göster"),
     "ps_tray_hint": ("Right-click to switch", "Açıp kapatmak için sağ tıklayın"),
     "ps_now": ("Now: {state}", "Şu an: {state}"),
-    "ps_info": ("Passage opens sites and apps blocked in Turkey, without a VPN and without slowing "
+    "ps_info": ("Passage opens sites and apps blocked in Türkiye, without a VPN and without slowing "
                 "anything else down.\n\n"
                 "1. It turns on encrypted DNS (Cloudflare), so your provider cannot redirect the site to its "
                 "warning page.\n"
@@ -438,7 +438,7 @@ def _install_service(args):
     p = _run(["sc", "create", SERVICE, "binPath=", bin_path, "start=", "auto", "DisplayName=", "Benchwise Passage"])
     if p.returncode != 0:
         raise RuntimeError((p.stdout or p.stderr).strip() or "sc create failed")
-    _run(["sc", "description", SERVICE, "Benchwise Passage: opens sites blocked in Turkey "
+    _run(["sc", "description", SERVICE, "Benchwise Passage: opens sites blocked in Türkiye "
           "without a VPN (zapret winws). Switch it off in Benchwise."])
     _run(["sc", "failure", SERVICE, "reset=", "86400", "actions=", "restart/5000/restart/10000/restart/60000"])
     p = _run(["sc", "start", SERVICE])
