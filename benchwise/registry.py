@@ -90,7 +90,7 @@ CATEGORIES = [
     ]),
     Category("network", "globe", [
         Tool("network.netdiag", "route", view=_tool("netdiag")),
-        Tool("network.netspeed", "gauge"),
+        Tool("network.netspeed", "gauge", view=_tool("netspeed")),
         Tool("network.wifi", "wifi"),
         Tool("network.netreset", "refresh", admin=True),
     ]),
