@@ -178,13 +178,14 @@ def table(parent, columns, height=8, stretch=None):
         s.map("Tool.Treeview", background=[("selected", "#22304d")])
         s.layout("Tool.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
         _style_done.add(id(top))
-    holder = ctk.CTkFrame(parent, fg_color=CARD)
+    holder = ctk.CTkFrame(parent, fg_color=CARD, height=10)    # grows to the table; the default 200 px would leave a gap
     tree = ttk.Treeview(holder, columns=[c[0] for c in columns], show="headings", style="Tool.Treeview",
                         height=height, selectmode="browse")
     for cid, heading, width in columns:
         tree.heading(cid, text=heading, anchor="w")
         tree.column(cid, width=width, stretch=(cid == stretch), anchor="w")
-    bar = ctk.CTkScrollbar(holder, command=tree.yview, fg_color=CARD, button_color=BORDER, width=12)
+    bar = ctk.CTkScrollbar(holder, command=tree.yview, fg_color=CARD, button_color=BORDER, width=12,
+                           height=20)                # default length 200 px would stretch short tables
     tree.configure(yscrollcommand=bar.set)
     bar.pack(side="right", fill="y")
     tree.pack(side="left", fill="both", expand=True)

@@ -97,7 +97,7 @@ CATEGORIES = [
     Category("windows", "windows", [
         Tool("windows.sfc", "shield", admin=True, view=_tool("sfc")),
         Tool("windows.update", "refresh", admin=True, view=_tool("update")),
-        Tool("windows.drivers", "chip"),
+        Tool("windows.drivers", "chip", view=_tool("drivers")),
         Tool("windows.startup", "rocket"),
     ]),
     Category("cleanup", "broom", [
