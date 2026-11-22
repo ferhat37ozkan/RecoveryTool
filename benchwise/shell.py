@@ -375,7 +375,7 @@ class Shell(ctk.CTk):
             return
         from . import livemode
         started = False
-        if livemode.supported() and livemode.enabled():
+        if livemode.points_here():
             from . import instance
             instance.release()
             started = livemode.start_elevated(show=True, open_tool=tool.id)     # no UAC prompt

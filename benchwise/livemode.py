@@ -51,6 +51,27 @@ def enabled():
     return supported() and task_command() is not None
 
 
+def _same_file(a, b):
+    norm = lambda x: os.path.normcase(os.path.abspath(x))
+    return norm(a) == norm(b)
+
+
+def points_here(cmd=None):
+    """Does the task start this very exe?  (Not when a newer copy was downloaded to another folder.)"""
+    cmd = task_command() if cmd is None else cmd
+    return bool(cmd) and supported() and _same_file(cmd, sys.executable)
+
+
+def repoint():
+    """Make the task start this exe, keeping its sign-in setting (needs administrator rights).
+    True when the task was changed."""
+    cmd = task_command()
+    if cmd is None or points_here(cmd):
+        return False
+    enable(start_with_windows=autostart())
+    return True
+
+
 def autostart():
     """Is the sign-in trigger of the task switched on?"""
     p = _schtasks("/Query", "/TN", TASK, "/XML")

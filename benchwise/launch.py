@@ -29,12 +29,24 @@ def run_window(args):
         from . import monitor
         if hidden and not monitor.selected():
             return 0                            # started with Windows but no disk is watched: nothing to do
-    elif not elevate.is_admin() and livemode.supported() and livemode.enabled():
-        # live mode: run elevated through the task instead of as a standard copy (no UAC prompt)
-        instance.release()
-        if livemode.start_elevated(show=True, open_tool=open_tool):
-            return 0
-        instance.acquire()
+    elif livemode.supported():
+        cmd = livemode.task_command()                   # None: live mode is off
+        if cmd is not None and elevate.is_admin():
+            try:
+                livemode.repoint()                      # a copy in another folder: the task now starts us
+            except Exception:
+                pass
+        elif cmd is not None:
+            instance.release()
+            if livemode.points_here(cmd):
+                # live mode: run elevated through the task instead of as a standard copy (no UAC prompt)
+                if livemode.start_elevated(show=True, open_tool=open_tool):
+                    return 0
+            elif elevate.restart_as_admin(open_tool):
+                # the task starts another copy of Benchwise (e.g. an older one in another folder):
+                # one UAC prompt, and that elevated start moves the task over to this exe
+                return 0
+            instance.acquire()
     from .shell import main
     main(open_tool=open_tool, hidden=hidden)
     return 0
