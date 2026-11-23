@@ -381,8 +381,8 @@ i18n.STRINGS.update({
     "tool_camera": ("Camera Test", "Kamera Testi"),
     "tool_camera_d": ("See what the webcam sees", "Kameranın gördüğünü izleyin"),
     # --- tools: network ---
-    "tool_netdiag": ("Connection Check", "Bağlantı Kontrolü"),
-    "tool_netdiag_d": ("Gateway, DNS, internet: find where it breaks", "Ağ geçidi, DNS, internet: nerede koptuğunu bulun"),
+    "tool_netdiag": ("Network Inspector", "Ağ Denetimi"),
+    "tool_netdiag_d": ("Every adapter tested on its own: addressing, router, DNS, internet, path and security", "Her ağ kartı ayrı ayrı: adresleme, modem, DNS, internet, yol ve güvenlik"),
     "tool_netspeed": ("Speed & Ping", "Hız ve Ping"),
     "tool_netspeed_d": ("Download, upload, latency and route", "İndirme, yükleme, gecikme ve rota"),
     "tool_wifi": ("Wi-Fi", "Wi-Fi"),
