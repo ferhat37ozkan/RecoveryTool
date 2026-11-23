@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## 1.4.0
+
+Added
+
+- **Network Inspector** (replaces Connection Check). Every adapter from `Get-NetAdapter` (cable, Wi-Fi,
+  virtual, VPN, Bluetooth, mobile) is a card, scanned one by one; the card's bottom strip is its
+  progress bar, then its verdict colour. All live tests are bound to the adapter's own IPv4 address
+  (`benchwise.netscan.probe`): ICMP through iphlpapi `IcmpSendEcho2Ex` (ping, first hops, path MTU with
+  Don't Fragment; no dependence on the Windows language), raw DNS queries to each server (with an
+  NXDOMAIN rewrite check), HTTP connect test, public address, router port check, SSDP/UPnP description
+  and port mappings. Previously the first adapter with a gateway was tested, so a virtual adapter
+  could answer for the Wi-Fi.
+- Detail panel on the right: connection chain, IPv4/IPv6 with subnet and address kinds, DHCP lease,
+  DNS, router, internet and path, Wi-Fi link (auth, cipher, PHY, band/channel, signal, rate) through
+  the WLAN API, Windows network profile, traffic counters, ARP neighbours, bindings, driver advanced
+  settings; Copy report.
+- Security review (`benchwise.netscan.security`): machine posture read once per scan (firewall
+  profiles, SMB1/signing, LLMNR, mDNS, WPAD, proxies, RDP/NLA, listening ports, hosts file, Wi-Fi
+  profiles that join open networks) judged against each adapter; findings bad / warning / info / good
+  with a fix each. Tests in `tests/test_netsec.py`.
+- Skeleton placeholders (`ui.ghost`, `ui.ghost_card`) with a shimmer that sweeps left to right.
+
+Changed
+
+- customtkinter's scrollbar no longer forces `update_idletasks()` on every redraw nor redraws an
+  unchanged position (patched once in `benchwise.ui`): pages with tables build much faster and the
+  window resizes more smoothly.
+- The network panel's text is plain Tk labels and its cards are added one at a time: first paint
+  ~1250 ms → ~300 ms.
+
 ## 1.3.1
 
 Fixed
