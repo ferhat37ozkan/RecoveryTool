@@ -1,9 +1,9 @@
 """Passage from outside the window.
 
-* ``Benchwise-cli.exe --hideme [on|off|status]``: in a terminal, with output.  ``on`` is the default.
+* ``Benchwise-cli.exe --hideme [on|off|repair|status]``: in a terminal, with output.  ``on`` is the default.
 * ``Benchwise.exe --hideme [on|off]``: no window; asks for administrator rights once if needed and
   switches Passage in the background.
-* ``Benchwise.exe --passage=on|off``: the elevated step the window starts (no output; the window
+* ``Benchwise.exe --passage=on|off|repair``: the elevated step the window starts (no output; the window
   follows it through ``passage.read_progress``).
 """
 
@@ -24,13 +24,15 @@ def _self_command(args):
 
 
 def start_elevated(on):
-    """Start the elevated ``--passage=on|off`` step (one UAC prompt).  True when it was started."""
-    exe, params = _self_command(["--passage=" + ("on" if on else "off")])
+    """Start the elevated ``--passage=on|off|repair`` step (one UAC prompt).  ``on`` is True, False
+    or "repair".  True when it was started."""
+    mode = on if isinstance(on, str) else ("on" if on else "off")
+    exe, params = _self_command(["--passage=" + mode])
     return ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 0) > 32
 
 
 def _mode(args):
-    rest = [a.lower() for a in args if a.lower() in ("on", "off", "status")]
+    rest = [a.lower() for a in args if a.lower() in ("on", "off", "repair", "status")]
     return rest[0] if rest else "on"
 
 
@@ -48,11 +50,19 @@ def window_entry(args):
     from . import passage
     first = args[0] if args else ""
     if first.startswith("--passage="):
-        on = first.split("=", 1)[1] == "on"
-        ok, _ = passage.enable() if on else passage.disable()
+        mode = first.split("=", 1)[1]
+        if mode == "repair":
+            ok, _ = passage.repair()
+        else:
+            ok, _ = passage.enable() if mode == "on" else passage.disable()
         return 0 if ok else 1
     if first == "--hideme":
-        on = _mode(args[1:]) != "off"
+        mode = _mode(args[1:])
+        if mode == "repair":
+            if passage.is_admin():
+                return 0 if passage.repair()[0] else 1
+            return 0 if start_elevated("repair") else 1
+        on = mode != "off"
         set_autostart(on)
         if passage.is_admin():
             ok, _ = passage.enable() if on else passage.disable()
@@ -67,13 +77,19 @@ def cli_entry(args):
     mode = _mode(args)
     if mode == "status":
         print("%s: %s" % (passage.t("ps_name"), passage.summary()))
+        for p in passage.problems():
+            print("  ! " + passage.t("ps_problem_" + p))
         return 0
     if not passage.is_admin():
         print(passage.t("ps_need_admin"), file=sys.stderr)
         print("Benchwise-cli.exe --hideme  (Run as administrator / Yönetici olarak çalıştırın)", file=sys.stderr)
         return 2
-    on = mode == "on"
     report = lambda text: print("  " + text, flush=True)
+    if mode == "repair":
+        ok, message = passage.repair(report)
+        print(message)
+        return 0 if ok else 1
+    on = mode == "on"
     ok, message = passage.enable(report) if on else passage.disable(report)
     print(message)
     if ok:

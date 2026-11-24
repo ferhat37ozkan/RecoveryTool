@@ -131,6 +131,21 @@ i18n.STRINGS.update({
     "ps_state_dns": ("Encrypted DNS", "Şifreli DNS"),
     "ps_state_plain": ("Cloudflare DNS (not encrypted)", "Cloudflare DNS (şifresiz)"),
     "ps_state_dpi": ("Encrypted DNS + packet engine ({name})", "Şifreli DNS + paket motoru ({name})"),
+    "ps_step_repair": ("Fixing Passage…", "Geçit düzeltiliyor…"),
+    "ps_repaired": ("Passage is working again.", "Geçit yeniden çalışıyor."),
+    "ps_repair_left": ("Passage could not fix: {what}", "Geçit şunu düzeltemedi: {what}"),
+    "ps_problem_service": ("the packet engine is not running", "paket motoru çalışmıyor"),
+    "ps_problem_dns": ("a network adapter is not using encrypted DNS", "bir ağ bağdaştırıcısı şifreli DNS kullanmıyor"),
+    "ps_problem_guard": ("automatic repair is not set up yet", "otomatik onarım henüz kurulu değil"),
+    "ps_problem_engine": ("the packet engine's files are missing", "paket motorunun dosyaları eksik"),
+    "ps_problem_other": ("another bypass tool is running", "başka bir engel aşma aracı çalışıyor"),
+    "ps_problem_error": ("the repair stopped with an error", "onarım bir hatayla durdu"),
+    "ps_problem_title": ("Passage: problem found", "Geçit: sorun algılandı"),
+    "ps_problem_fixing": ("{what}. Fixing it now…", "{what}. Düzeltiliyor…"),
+    "ps_problem_declined": ("{what}. Right-click the icon next to the clock and choose “Fix Passage”.",
+                            "{what}. Saatin yanındaki simgeye sağ tıklayıp “Geçit'i onar”ı seçin."),
+    "ps_fix": ("Fix Passage", "Geçit'i onar"),
+    "ps_problem_short": ("Problem found", "Sorun var"),
 })
 
 
@@ -507,6 +522,7 @@ def enable(report=None):
             state.pop("preset", None)
             state.pop("preset_name", None)
             _save_state(state)
+            _install_guard(state)
             return _finish(True, t("ps_done_dns" if encrypted else "ps_done_plain"))
         # layer 2: packet engine, presets in turn
         if not engine_ready():
@@ -520,6 +536,7 @@ def enable(report=None):
             if _probe_twice():
                 state.update(layer="dpi", preset=pid, preset_name=name)
                 _save_state(state)
+                _install_guard(state)
                 return _finish(True, t("ps_done_dpi", name=name))
         _remove_service()
         disable(report=None, quiet=True)
@@ -539,6 +556,7 @@ def disable(report=None, quiet=False):
     try:
         if not quiet:
             _progress(report, "ps_step_off")
+        _remove_guard()
         _remove_service()
         state = load_state()
         if state.get("dns_saved"):
@@ -550,10 +568,117 @@ def disable(report=None, quiet=False):
         return (False, str(ex)) if quiet else _finish(False, t("ps_fail_error", err=ex))
 
 
-def ensure_running():
-    """At start (elevated): an enabled DPI layer whose service was removed from outside comes back."""
+# -- health and repair ------------------------------------------------------------------------------
+def _install_guard(state):
+    """The task that keeps Passage working without asking again (benchwise.passage_guard).  A
+    failure here does not undo Passage: Benchwise then repairs with a UAC prompt instead."""
+    from . import passage_guard
+    try:
+        passage_guard.install(state)
+    except Exception:
+        pass
+
+
+def _remove_guard():
+    from . import passage_guard
+    try:
+        passage_guard.remove()
+    except Exception:
+        pass
+
+
+def _uses_cloudflare(adapter):
+    return any(s in adapter.get("v4", "") for s in CLOUDFLARE_V4)
+
+
+def problems(adapters=None):
+    """What is wrong with a Passage that is on, read without administrator rights.
+
+    ``"service"``: the packet engine's service is missing or not running.
+    ``"dns"``: a connected adapter does not use Cloudflare (one added after Passage was switched on,
+    or one whose settings were changed from outside).
+    ``"guard"``: the task that repairs without asking is not set up (Passage switched on by an older
+    Benchwise, or its script is out of date).  Empty when all is well or Passage is off."""
     st = load_state()
-    if st.get("enabled") and st.get("layer") == "dpi" and service_state() is None and is_admin() and engine_ready():
-        args = next((a for p, n, a in PRESETS if p == st.get("preset")), None)
-        if args:
-            _install_service(args)
+    if not st.get("enabled"):
+        return []
+    from . import passage_guard
+    found = []
+    if st.get("layer") == "dpi" and service_state() not in ("running", "start_pending"):
+        found.append("service")
+    try:
+        if adapters is None:
+            adapters = _adapters()
+        if any(not _uses_cloudflare(a) for a in adapters):
+            found.append("dns")
+    except Exception:
+        pass
+    if not passage_guard.ready(st):
+        found.append("guard")
+    return found
+
+
+def _repair_dns(state):
+    """Cloudflare on every connected adapter; one seen for the first time is remembered first, so
+    switching Passage off puts its own settings back too."""
+    now = _adapters()
+    saved = state.setdefault("dns_saved", [])
+    known = {a.get("guid"): a for a in saved}
+    todo = []
+    for a in now:
+        old = known.get(a["guid"])
+        if old is None:
+            saved.append(dict(a))                       # its settings before Passage
+        else:
+            old["index"] = a["index"]                   # the index can change (driver reinstalled)
+        if not _uses_cloudflare(a):
+            todo.append(a)
+    _save_state(state)
+    if todo:
+        _apply_dns(todo, encrypted=state.get("encrypted", True))
+    return bool(todo)
+
+
+def _repair_service(state):
+    args = next((a for p, n, a in PRESETS if p == state.get("preset")), None)
+    if args is None:
+        raise RuntimeError("no saved preset")
+    if not engine_ready():
+        _download_engine()
+        _harden_root()
+    if service_state() is None:
+        _install_service(args)
+        return
+    _run(["sc", "start", SERVICE])
+    for _ in range(20):
+        if service_state() == "running":
+            return
+        time.sleep(0.25)
+    _install_service(args)                              # would not start: set it up again
+
+
+def repair(report=None):
+    """Fix what ``problems`` finds (needs administrator rights).  Returns ``(ok, message)``."""
+    if not is_admin():
+        return _finish(False, t("ps_need_admin"))
+    state = load_state()
+    if not state.get("enabled"):
+        return _finish(True, t("ps_off"))
+    try:
+        _progress(report, "ps_step_repair")
+        _harden_root()
+        _repair_dns(state)
+        if state.get("layer") == "dpi":
+            other = other_engine()
+            if other:
+                return _finish(False, t("ps_fail_other", name=other))
+            _repair_service(state)
+        _install_guard(load_state())
+        _flush_dns()
+        left = problems()
+        if left:
+            return _finish(False, t("ps_repair_left", what=", ".join(t("ps_problem_" + p) for p in left)))
+        return _finish(True, t("ps_repaired"))
+    except Exception as ex:
+        return _finish(False, t("ps_fail_error", err=ex))
+

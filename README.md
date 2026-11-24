@@ -306,14 +306,24 @@ Blocks come in two layers, and Passage answers them one at a time, stopping at t
 
 - **Stays on** after a restart (adapter settings and an automatic service); Benchwise starts next to the
   clock at sign-in.
+- **Repairs itself without asking again.** Switching Passage on also registers a small Windows task
+  (`Benchwise Passage`, runs as SYSTEM) that checks at start-up, whenever a network connects and every
+  15 minutes: a network adapter that is not using Cloudflare (a new one is remembered first, so switching
+  off puts its own settings back) is switched over, and a stopped or removed service is started again.
+  It changes nothing when all is well. The task runs a script from the locked-down Passage folder, never
+  Benchwise.exe itself. Next to the clock, Benchwise also checks once a minute (only reading); a problem
+  seen twice in a row shows "Problem found, fixing" and is fixed through that task, with no UAC prompt
+  and nothing interrupting a game. Only when the task cannot fix it does Benchwise ask for
+  administrator rights once, and never while a full-screen game is running. "Fix Passage" in the tray
+  menu does the same with one click.
 - **Switching it off puts everything back**: the previous DNS settings of every adapter are restored
   exactly and the service is removed. Programs that were already open may keep their existing
   connection until they are restarted.
 - **Its own icon next to the clock** in the shape of the connection (Wi-Fi or Ethernet): grey off, orange
   while switching, green on. Right-click it to switch. Click the name "Passage" in the window to hide it.
 - **Command line**: `Benchwise-cli.exe --hideme` switches it on (administrator terminal), `--hideme off`
-  switches it off, `--hideme status` prints the state. `Benchwise.exe --hideme` does the same without a
-  window and asks for administrator rights once.
+  switches it off, `--hideme status` prints the state and any problem, `--hideme repair` fixes it.
+  `Benchwise.exe --hideme` does the same without a window and asks for administrator rights once.
 - Changing network settings needs administrator rights; Benchwise asks with one UAC prompt.
 
 The approach builds on [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI),
@@ -485,14 +495,23 @@ bunlara sırayla cevap verir ve yeten ilk katmanda durur:
    kullanıcılar bu klasörü okuyabilir ama değiştiremez.
 
 - Bilgisayar yeniden başlasa da **açık kalır**; Benchwise oturum açılışında saatin yanında başlar.
+- **Bir daha sormadan kendini onarır.** Geçit açılırken küçük bir Windows görevi de kurulur
+  (`Benchwise Passage`, SYSTEM olarak çalışır). Bu görev açılışta, her ağ bağlantısında ve 15 dakikada bir
+  kontrol eder: Cloudflare kullanmayan bir ağ kartını geçirir (yeni bir kartın kendi ayarları önce
+  kaydedilir, kapatınca onlar geri gelir), durmuş ya da silinmiş hizmeti yeniden başlatır. Her şey
+  yolundaysa hiçbir şeyi değiştirmez. Görev, kilitli Geçit klasöründeki bir betiği çalıştırır,
+  Benchwise.exe'yi asla. Saatin yanındaki Benchwise de dakikada bir yalnızca okuyarak kontrol eder; üst
+  üste iki kez görülen bir sorunda "Sorun algılandı, düzeltiliyor" der ve bu görevle, UAC sorusu
+  olmadan, oyunu bölmeden düzeltir. Görev düzeltemezse Benchwise bir kez yönetici izni ister; tam ekran
+  bir oyun açıkken asla. Tray menüsündeki "Geçit'i onar" aynı işi tek tıkla yapar.
 - **Kapatınca her şey geri gelir**: her ağ kartının önceki DNS ayarları aynen geri yüklenir, hizmet
   kaldırılır. Zaten açık olan programlar, yeniden başlatılana kadar mevcut bağlantılarını kullanabilir.
 - **Saatin yanında kendi simgesi** bağlantının şeklindedir (Wi-Fi ya da Ethernet): gri kapalı, turuncu
   geçiş sırasında, yeşil açık. Sağ tıkla açılıp kapanır. Gizlemek için penceredeki "Geçit" yazısına
   tıklayın.
 - **Komut satırı**: `Benchwise-cli.exe --hideme` açar (yönetici terminali), `--hideme off` kapatır,
-  `--hideme status` durumu yazar. `Benchwise.exe --hideme` aynı işi pencere açmadan yapar ve bir kez
-  yönetici izni ister.
+  `--hideme status` durumu ve varsa sorunu yazar, `--hideme repair` onarır.
+  `Benchwise.exe --hideme` aynı işi pencere açmadan yapar ve bir kez yönetici izni ister.
 - Ağ ayarlarını değiştirmek yönetici yetkisi ister; Benchwise tek bir UAC sorusuyla ister.
 
 Yaklaşım [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI),

@@ -32,6 +32,9 @@ GAP = 16
 
 APP_TRAY_KEY = "benchwise"           # key of the program's own icon next to the clock
 PASSAGE_TRAY_KEY = "passage"         # the Passage icon: grey off, orange switching, green on
+PASSAGE_FIRST_CHECK_MS = 20_000      # the first health check, once the network is up after sign-in
+PASSAGE_CHECK_MS = 60_000            # then once a minute (read-only, nothing on the network changes)
+PASSAGE_PROBLEMS = ("service", "dns", "guard", "engine", "other", "error")
 
 
 def resource(name):
@@ -132,6 +135,14 @@ class Shell(ctk.CTk):
         from . import passage
         self.passage_on = passage.is_on()   # Passage (Geçit): sites blocked in Turkey
         self.passage_busy = None            # time the running switch started, while it runs
+        self.passage_repairing = False      # the running step is a repair, not a switch
+        self.passage_problems = []          # problems seen in two checks in a row (passage.problems)
+        self.passage_seen = []              # what the last check saw
+        self.passage_declined = None        # problems whose automatic repair was refused: not asked again
+        self.passage_checks = []            # results handed over by the check thread
+        self.passage_checking = False
+        self.passage_via_guard = False      # the running repair goes through the guard task
+        self.passage_guard_failed = False   # it could not fix the last problem: Benchwise repairs itself
         self.show_asked = []        # set from another thread when a second start asks to be shown
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.bind("<Destroy>", lambda e: self.stop_tray() if e.widget is self else None)
@@ -149,6 +160,7 @@ class Shell(ctk.CTk):
         instance.listen(lambda: self.show_asked.append(True))
         self.after(600, self.tick_tray)
         self.after(1500, self.passage_startup)
+        self.after(PASSAGE_FIRST_CHECK_MS, self.passage_health)
         if not hidden:
             self.update_idletasks()
             self.after(30, self.reveal)
@@ -415,19 +427,93 @@ class Shell(ctk.CTk):
         if self.passage_busy:
             self.passage_status.configure(text=text or t("ps_busy"), text_color=WARN)
             self.passage_switch.configure(state="disabled")
+        elif self.passage_on and self.passage_problems:
+            self.passage_status.configure(text=t("ps_problem_short"), text_color=WARN)
+            self.passage_switch.configure(state="normal")
         else:
             self.passage_status.configure(text=t("ps_on" if self.passage_on else "ps_off"),
                                           text_color=GOOD if self.passage_on else MUTED)
             self.passage_switch.configure(state="normal")
 
     def passage_startup(self):
-        """Keep the sign-in entry pointing at this exe, and an enabled engine running."""
-        from . import passage, passage_cli
-        if not self.passage_on:
+        """Keep the sign-in entry pointing at this exe (the health check keeps the engine running)."""
+        from . import passage_cli
+        if self.passage_on:
+            passage_cli.set_autostart(True)
+
+    # Health: once a minute, while Passage is on, a read-only look (service state, adapter DNS
+    # settings; nothing on the network is touched).  A problem seen twice in a row is fixed at once.
+    def passage_health(self):
+        from . import passage
+        if not self.winfo_exists():
             return
-        passage_cli.set_autostart(True)
-        if self.admin:
-            threading.Thread(target=lambda: _quiet(passage.ensure_running), daemon=True).start()
+        self.after(PASSAGE_CHECK_MS, self.passage_health)
+        if not self.passage_on or self.passage_busy or self.passage_checking:
+            return
+        self.passage_checking = True
+
+        def run():
+            try:
+                found = passage.problems()
+            except Exception:
+                found = []
+            self.passage_checks.append(found)
+        threading.Thread(target=run, daemon=True).start()
+        self.after(300, self.passage_health_done)
+
+    def passage_health_done(self):
+        if not self.passage_checks:
+            return self.after(300, self.passage_health_done)
+        found = self.passage_checks.pop()
+        self.passage_checking = False
+        if not self.passage_on or self.passage_busy:
+            return
+        confirmed = [p for p in found if p in self.passage_seen]     # twice in a row: not a passing moment
+        self.passage_seen = found
+        if confirmed != self.passage_problems:
+            self.passage_problems = confirmed
+            self.passage_show()
+        if not confirmed:
+            self.passage_declined = None
+        elif self.passage_declined != confirmed:
+            self.passage_repair(auto=True)
+
+    def passage_problem_text(self):
+        text = "; ".join(t("ps_problem_" + p) for p in self.passage_problems) or t("ps_problem_short")
+        return text[:1].upper() + text[1:]
+
+    def passage_repair(self, auto=False, told=False):
+        """Fix everything in one go.  First through the guard task (no prompt, nothing interrupts a
+        game); when that is not set up or cannot fix it, through Benchwise itself: elevated already,
+        or one UAC prompt - which waits while a full-screen game runs or the screen is locked."""
+        from . import passage, passage_cli, passage_guard
+        if self.passage_busy or not self.passage_on:
+            return
+        what = self.passage_problem_text()
+        use_guard = "guard" not in self.passage_problems and not self.passage_guard_failed
+        if auto and not use_guard and not self.admin and passage_guard.user_busy():
+            return                          # asked again at the next check, once the game is over
+        if auto and not told and self.tray is not None:
+            self.tray.notify(t("ps_problem_title"), t("ps_problem_fixing", what=what))
+        self.passage_busy = time.time()
+        self.passage_repairing = True
+        self.passage_via_guard = False
+        self.tray_version = -1
+        self.passage_show()
+        if use_guard and passage_guard.run():
+            self.passage_via_guard = True
+        elif self.admin:
+            threading.Thread(target=lambda: _quiet(passage.repair), daemon=True).start()
+        elif not passage_cli.start_elevated("repair"):     # the UAC prompt was declined
+            self.passage_busy = None
+            self.passage_repairing = False
+            self.passage_declined = list(self.passage_problems)
+            self.tray_version = -1
+            self.passage_show()
+            if auto and self.tray is not None:
+                self.tray.notify(t("ps_problem_title"), t("ps_problem_declined", what=what))
+            return
+        self.after(400, self.passage_poll)
 
     def passage_toggle(self, want):
         from . import passage, passage_cli
@@ -458,16 +544,47 @@ class Shell(ctk.CTk):
             self.passage_on = passage.is_on()
             passage_cli.set_autostart(self.passage_on)
             self.tray_version = -1
+            if self.passage_repairing:
+                return self.passage_repaired(prog)
+            self.passage_problems, self.passage_seen = [], []
             self.passage_show()
             if not prog.get("ok"):          # success shows in the switch and the icon; only a failure is told
                 messagebox.showwarning(t("ps_name"), prog.get("text", ""))
             return
+        if self.passage_repairing and self.passage_via_guard and time.time() - self.passage_busy > 90:
+            self.passage_busy = None                       # the task never reported back
+            return self.passage_repaired({"ok": False})
         if time.time() - self.passage_busy > 600:         # the elevated step never reported back
             self.passage_busy = None
+            self.passage_repairing = False
             self.passage_on = passage.is_on()
             return self.passage_show()
         self.passage_show(prog.get("text") if fresh else None)
         self.after(400, self.passage_poll)
+
+    def passage_repaired(self, prog):
+        """A repair finished (``prog``: its progress record)."""
+        self.passage_repairing = False
+        ok = bool(prog.get("ok"))
+        if not ok and self.passage_via_guard:
+            # the task could not fix it (or is not there for this user): Benchwise itself tries next
+            self.passage_guard_failed = True
+            self.passage_show()
+            return self.after(200, lambda: self.passage_repair(auto=True, told=True))
+        if ok:
+            self.passage_problems, self.passage_seen, self.passage_declined = [], [], None
+            self.passage_guard_failed = False
+            text = t("ps_repaired")
+        else:                               # not tried again by itself for the same problems; the menu line stays
+            self.passage_declined = list(self.passage_problems)
+            left = [p for p in prog.get("problems") or [] if p in PASSAGE_PROBLEMS]
+            text = (t("ps_repair_left", what=", ".join(t("ps_problem_" + p) for p in left)) if left
+                    else prog.get("text") or t("ps_problem_short"))
+        self.passage_show()
+        if self.tray is not None:
+            self.tray.notify(t("ps_name"), text)
+        elif not ok:
+            messagebox.showwarning(t("ps_name"), text)
 
     def passage_info(self):
         """What Passage does, its state now, and whether its icon sits next to the clock."""
@@ -494,8 +611,18 @@ class Shell(ctk.CTk):
         ctk.CTkCheckBox(box, text=t("ps_show_tray"), variable=tray_var, command=tray_changed,
                         font=("Segoe UI", 12), text_color=TEXT, checkbox_width=18, checkbox_height=18).pack(
             anchor="w", pady=(16, 4))
-        ctk.CTkButton(box, text=t("tc_close"), width=100, command=win.destroy, fg_color=ACCENT).pack(
-            anchor="e", pady=(10, 0))
+        buttons = ctk.CTkFrame(box, fg_color=BG)
+        buttons.pack(fill="x", pady=(10, 0))
+        ctk.CTkButton(buttons, text=t("tc_close"), width=100, command=win.destroy, fg_color=ACCENT).pack(side="right")
+        if self.passage_on and self.passage_problems:
+            ctk.CTkLabel(box, text=self.passage_problem_text(), font=("Segoe UI", 12), text_color=WARN,
+                         anchor="w", wraplength=460, justify="left").pack(fill="x", before=buttons, pady=(8, 0))
+
+            def fix():
+                win.destroy()
+                self.passage_repair()
+            ctk.CTkButton(buttons, text=t("ps_fix"), width=120, command=fix, fg_color=WARN).pack(
+                side="right", padx=(0, 8))
         win.update_idletasks()
         x = self.winfo_rootx() + self.winfo_width() - win.winfo_reqwidth() - 40
         win.geometry("+%d+%d" % (max(x, 0), self.winfo_rooty() + 60))
@@ -533,6 +660,7 @@ class Shell(ctk.CTk):
             if self.tray.passage != passage_menu:
                 self.tray.passage = passage_menu
                 self.tray_version = -1
+            self.tray.fix = t("ps_fix") if self.passage_on and self.passage_problems and not self.passage_busy else None
             if self.monitor.version != self.tray_version:
                 self.tray_version = self.monitor.version
                 shown = [self.passage_tray_icon()] if settings.get("passage_tray", True) else []
@@ -557,6 +685,9 @@ class Shell(ctk.CTk):
                 return self.quit_app()
             if kind == "passage":
                 self.passage_toggle(not self.passage_on)
+                continue
+            if kind == "fix":
+                self.passage_repair()
                 continue
             self.show_window()
             if kind == "click" and key in (APP_TRAY_KEY, PASSAGE_TRAY_KEY):

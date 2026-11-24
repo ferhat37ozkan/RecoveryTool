@@ -180,14 +180,16 @@ def _register_class(hinst):
 
 
 class Tray:
-    """Icons next to the clock.  ``events`` gets ("click", key), ("open", None), ("passage", None)
-    and ("quit", None).  The Passage line shows only when ``passage`` is set: (label, checked)."""
+    """Icons next to the clock.  ``events`` gets ("click", key), ("open", None), ("passage", None),
+    ("fix", None) and ("quit", None).  The Passage line shows only when ``passage`` is set:
+    (label, checked); the repair line only when ``fix`` is set (its label)."""
 
-    MENU_OPEN, MENU_QUIT, MENU_PASSAGE = 1, 2, 3
+    MENU_OPEN, MENU_QUIT, MENU_PASSAGE, MENU_FIX = 1, 2, 3, 4
 
     def __init__(self, labels=("Open", "Quit")):
         self.labels = labels
         self.passage = None
+        self.fix = None
         self.events = queue.Queue()
         self.requests = queue.Queue()
         self.icons = {}             # key -> (uID, HICON, tip)
@@ -261,6 +263,8 @@ class Tray:
         if self.passage:
             label, checked = self.passage
             user32.AppendMenuW(menu, 0x8 if checked else 0, self.MENU_PASSAGE, label)    # MF_CHECKED
+        if self.fix:
+            user32.AppendMenuW(menu, 0, self.MENU_FIX, self.fix)
         user32.AppendMenuW(menu, 0x800, 0, None)                   # separator
         user32.AppendMenuW(menu, 0, self.MENU_QUIT, self.labels[1])
         pt = w.POINT()
@@ -274,6 +278,8 @@ class Tray:
             self.events.put(("quit", None))
         elif cmd == self.MENU_PASSAGE:
             self.events.put(("passage", None))
+        elif cmd == self.MENU_FIX:
+            self.events.put(("fix", None))
 
     def _handle(self, hwnd, msg, wparam, lparam):
         if msg == CALLBACK:
