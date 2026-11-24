@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 1.5.0
+
+Added
+
+- **Passage repairs itself** (`benchwise.passage_guard`). Switching Passage on also registers the Task
+  Scheduler task `Benchwise Passage`: SYSTEM, at start-up, on NetworkProfile event 10000 (a network
+  connected) and every 15 minutes, startable by Authenticated Users (task SDDL), so repairs need no UAC.
+  It runs `repair.ps1` from the locked-down `%ProgramData%\Benchwise\Passage` folder, never Benchwise.exe
+  (user-writable, so running it as SYSTEM would hand its user administrator rights). The script puts
+  Cloudflare (and DoH) on every connected physical adapter not using it, saving a new adapter's own
+  settings into the state first so switching off restores them, follows a changed interface index,
+  and starts or re-creates the packet engine service; it changes nothing when all is well.
+- `passage.problems()` (read only: `service`, `dns`, `guard`) and `passage.repair()` (elevated; also
+  re-installs the task). Benchwise next to the clock checks once a minute; a problem seen in two checks
+  in a row is announced and fixed through the task, else through Benchwise elevated (one UAC prompt,
+  never while `SHQueryUserNotificationState` reports a full-screen app, presentation mode or a locked
+  screen). "Fix Passage" in the tray menu and the Passage window.
+- `Benchwise-cli --hideme repair`; `--hideme status` lists problems. `Benchwise.exe --passage=repair`.
+- Tests in `tests/test_passage.py`.
+
+Changed
+
+- Switching Passage off removes the task and the script. The elevated start no longer repairs the
+  service on its own (the health check does it, with a notice).
+
 ## 1.4.0
 
 Added
