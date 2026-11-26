@@ -8,10 +8,12 @@ import ctypes
 import ctypes.wintypes as w
 import hashlib
 import os
+import queue
 import stat
 import subprocess
+import threading
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -28,8 +30,11 @@ texts({
                "gösterilir. Kaldırılan dosyalar Geri Dönüşüm Kutusu'na gider."),
     "dp_choose": ("Choose a folder…", "Klasör seç…"),
     "dp_min": ("Smallest file", "En küçük dosya"),
-    "dp_scanning": ("Looking… {n} files", "Aranıyor… {n} dosya"),
-    "dp_hashing": ("Comparing contents… {done} / {total}", "İçerikler karşılaştırılıyor… {done} / {total}"),
+    "dp_scanning": ("Searching… {d} folders, {n} files · {groups} groups of duplicates so far",
+                    "Aranıyor… {d} klasör, {n} dosya · şimdiye dek {groups} kopya grubu"),
+    "dp_stop": ("Stop", "Durdur"),
+    "dp_stopped": ("Stopped. {groups} groups found until then.", "Durduruldu. O ana kadar {groups} grup bulundu."),
+    "dp_start": ("Starting…", "Başlıyor…"),
     "dp_none": ("No duplicates found in {folder}.", "{folder} içinde kopya bulunamadı."),
     "dp_summary": ("{groups} groups of duplicates, {waste} could be freed.", "{groups} kopya grubu; {waste} yer açılabilir."),
     "dp_keep_newest": ("Select all but the newest in each group", "Her grupta en yenisi dışındakileri seç"),
@@ -47,37 +52,25 @@ texts({
     "dp_moved_one": ("{name} was moved to the Recycle Bin.", "{name} Geri Dönüşüm Kutusu'na taşındı."),
 })
 
-MAX_GROUPS_SHOWN = 150
+MAX_GROUPS_SHOWN = 100
+LIVE_GROUPS_SHOWN = 40         # cards drawn while the search runs; all are sorted and drawn at the end
+THUMB = 48
 
 
-def scan(folder, min_size, progress):
-    """{sha256: [(path, size, mtime)]} for groups of 2+ identical files."""
+def scan(folder, min_size, progress, found=None, job=None):
+    """{key: [(path, size, mtime)]} for groups of 2+ identical files.
+
+    Files are compared while the folders are walked: a file is read only when another file of the
+    same size was seen, first its first 64 KB, then (if those match) all of it.  So a duplicate is
+    known, and ``found(key, files)`` told, as soon as its second copy turns up; a group that grows
+    later is told again.  ``progress(files, folders, groups)`` a few times a second.
+    ``job["stop"]`` ends early (what was found until then is returned)."""
+    job = job or {"stop": False}
     by_size = defaultdict(list)
-    seen = 0
-    stack = [folder]
-    while stack:
-        d = stack.pop()
-        try:
-            with os.scandir(d) as it:
-                for e in it:
-                    try:
-                        st = e.stat(follow_symlinks=False)
-                    except OSError:
-                        continue
-                    if getattr(st, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
-                        continue
-                    if stat.S_ISDIR(st.st_mode):
-                        stack.append(e.path)
-                    elif st.st_size >= min_size:
-                        by_size[st.st_size].append((e.path, st.st_size, st.st_mtime))
-                        seen += 1
-                        if seen % 500 == 0:
-                            progress("scan", seen, 0)
-        except OSError:
-            continue
-    candidates = [g for g in by_size.values() if len(g) > 1]
-    total = sum(len(g) for g in candidates)
-    done = 0
+    heads, fulls = {}, {}
+    groups, member = {}, {}             # key -> files; path -> key
+    seen = dirs = 0
+    last = 0.0
 
     def digest(path, limit=None):
         h = hashlib.sha256()
@@ -86,32 +79,82 @@ def scan(folder, min_size, progress):
                 h.update(f.read(limit))
             else:
                 for chunk in iter(lambda: f.read(1 << 20), b""):
+                    if job["stop"]:
+                        raise InterruptedError
                     h.update(chunk)
         return h.hexdigest()
 
-    groups = {}
-    for group in candidates:
-        by_head = defaultdict(list)
-        for item in group:
+    def head(item):
+        if item[0] not in heads:
             try:
-                by_head[digest(item[0], 65536)].append(item)
+                heads[item[0]] = digest(item[0], 65536)
             except OSError:
-                pass
-            done += 1
-            if done % 50 == 0:
-                progress("hash", done, total)
-        for same_head in by_head.values():
-            if len(same_head) < 2:
+                heads[item[0]] = None
+        return heads[item[0]]
+
+    def full(item):                     # up to 64 KB the head already is the whole file
+        if item[1] <= 65536:
+            return head(item)
+        if item[0] not in fulls:
+            try:
+                fulls[item[0]] = digest(item[0])
+            except OSError:
+                fulls[item[0]] = None
+        return fulls[item[0]]
+
+    def compare(item):
+        peers = list(by_size[item[1]])
+        by_size[item[1]].append(item)
+        if not peers or head(item) is None:
+            return
+        same = [x for x in peers if head(x) == heads[item[0]]]
+        if not same or full(item) is None:
+            return
+        same = [x for x in same if full(x) == full(item)]
+        if not same:
+            return
+        key = full(item) + str(item[1])
+        if key in groups:
+            groups[key].append(item)
+        else:
+            groups[key] = same + [item]
+            for x in same:
+                member[x[0]] = key
+        member[item[0]] = key
+        if found:
+            found(key, list(groups[key]))
+
+    stack = [folder]
+    try:
+        while stack and not job["stop"]:
+            d = stack.pop()
+            dirs += 1
+            try:
+                with os.scandir(d) as it:
+                    entries = list(it)
+            except OSError:
                 continue
-            by_full = defaultdict(list)
-            for item in same_head:
+            for e in entries:
+                if job["stop"]:
+                    break
                 try:
-                    by_full[digest(item[0]) if item[1] > 65536 else "h" + str(item[1])].append(item)
+                    st = e.stat(follow_symlinks=False)
                 except OSError:
-                    pass
-            for key, items in by_full.items():
-                if len(items) > 1:
-                    groups[key + str(items[0][1])] = items
+                    continue
+                if getattr(st, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                    continue
+                if stat.S_ISDIR(st.st_mode):
+                    stack.append(e.path)
+                elif st.st_size >= min_size:
+                    seen += 1
+                    compare((e.path, st.st_size, st.st_mtime))
+                now = time.time()
+                if now - last > 0.2:
+                    last = now
+                    progress(seen, dirs, len(groups))
+    except InterruptedError:
+        pass
+    progress(seen, dirs, len(groups))
     return groups
 
 
@@ -146,8 +189,14 @@ class View(ToolView):
                                               selected_color=ui.ACCENT, unselected_color=ui.CARD)
         self.min_seg.set("1 MB")
         self.min_seg.pack(side="left")
-        self.info = ctk.CTkLabel(row, text=" ", font=("Segoe UI", 12), text_color=ui.MUTED)
-        self.info.pack(side="left", padx=14)
+        self.stop_btn = ui.button(row, t("dp_stop"), self.stop, 100)
+        self.stop_btn.pack(side="left", padx=(16, 0))
+        self.stop_btn.configure(state="disabled")
+        self.bar = ctk.CTkProgressBar(c, height=8, progress_color=ui.ACCENT, fg_color=ui.BORDER)
+        self.bar.set(0)
+        self.bar.pack(fill="x", padx=18, pady=(0, 6))
+        self.info = ctk.CTkLabel(c, text=" ", font=("Segoe UI", 12), text_color=ui.MUTED, anchor="w")
+        self.info.pack(fill="x", padx=18, pady=(0, 10))
         self.results = ctk.CTkScrollableFrame(self.body, fg_color=ui.BG, scrollbar_button_color=ui.BORDER)
         self.results.pack(fill="both", expand=True)
         bar = ctk.CTkFrame(self.body, fg_color="transparent")
@@ -159,6 +208,16 @@ class View(ToolView):
         ui.button(bar, t("dp_clear_sel"), lambda: self.select(False), 130).pack(side="right", padx=8)
         ui.button(bar, t("dp_keep_newest"), lambda: self.select(True), 280).pack(side="right")
         self.vars, self.groups = {}, {}
+        self.job, self.cards = None, {}
+        self.pending, self.draining, self.draw_token = OrderedDict(), False, 0
+        self.thumbs, self.thumb_q, self.thumb_thread = {}, queue.Queue(), None
+
+    def busy(self):
+        return self.job is not None
+
+    def stop(self):
+        if self.job:
+            self.job["stop"] = True
 
     def choose(self):
         start = getattr(self, "folder", None) or os.path.expanduser("~")
@@ -167,17 +226,73 @@ class View(ToolView):
             return
         self.folder = folder = os.path.normpath(folder)
         self.choose_btn.configure(state="disabled")
-
-        def progress(kind, a, b):
-            text = t("dp_scanning", n=a) if kind == "scan" else t("dp_hashing", done=a, total=b)
-            self.post(self.info.configure, {"text": text})
-        self.run(lambda: scan(folder, self.mins[self.min_seg.get()], progress), self.show)
-
-    def show(self, groups):
-        self.choose_btn.configure(state="normal")
+        self.min_seg.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.draw_token += 1
+        self.pending.clear()
         for w_ in self.results.winfo_children():
             w_.destroy()
-        self.vars = {}
+        self.vars, self.groups, self.cards = {}, {}, {}
+        self.update_sel()
+        self.info.configure(text=t("dp_start"), text_color=ui.MUTED)
+        self.bar.configure(mode="indeterminate")
+        self.bar.start()
+        self.job = job = {"stop": False}
+        min_size = self.mins[self.min_seg.get()]
+        self.run(lambda: scan(folder, min_size, lambda *a: self.post(self.progress, *a),
+                              lambda *a: self.post(self.found, *a), job), self.finished)
+
+    def progress(self, files, folders, groups):
+        self.info.configure(text=t("dp_scanning", n=files, d=folders, groups=groups))
+
+    # Drawing customtkinter widgets is slow, so new groups are drawn a few at a time (about 40 ms of
+    # work per 60 ms): the window keeps answering while hundreds of duplicates turn up.
+    def found(self, key, files):
+        """A duplicate turned up during the search: listed at once (a group that grew is redrawn)."""
+        self.pending[key] = files
+        self.pending.move_to_end(key)
+        if not self.draining:
+            self.draining = True
+            self.after(30, self.drain)
+
+    def drain(self):
+        t0 = time.time()
+        while self.pending and time.time() - t0 < 0.04:
+            key, files = self.pending.popitem(last=False)
+            if key in self.cards:
+                self.fill_group(self.cards[key], files)
+            elif len(self.cards) < LIVE_GROUPS_SHOWN:
+                self.add_group(files, key=key)
+        if self.pending:
+            self.after(60, self.drain)
+        else:
+            self.draining = False
+
+    def finished(self, groups):
+        stopped = bool(self.job and self.job["stop"])
+        self.job = None
+        self.pending.clear()
+        self.bar.stop()
+        self.bar.configure(mode="determinate")
+        self.bar.set(0 if stopped else 1)
+        self.stop_btn.configure(state="disabled")
+        self.min_seg.configure(state="normal")
+        keep = {p for p, (v, _, _) in self.vars.items() if v.get()}
+        if not isinstance(groups, Exception):        # files removed while it ran are left out
+            groups = {k: [x for x in g if os.path.exists(x[0])] for k, g in groups.items()}
+            groups = {k: g for k, g in groups.items() if len(g) > 1}
+        self.show(groups, keep)
+        if stopped and not isinstance(groups, Exception):
+            self.info.configure(text=t("dp_stopped", groups=len(groups)), text_color=ui.WARN)
+
+    def show(self, groups, keep=()):
+        """All groups, the most space first, drawn in small steps."""
+        self.choose_btn.configure(state="normal")
+        self.draw_token += 1
+        token = self.draw_token
+        for w_ in self.results.winfo_children():
+            w_.destroy()
+        self.vars, self.cards = {}, {}
         if isinstance(groups, Exception):
             self.info.configure(text=str(groups), text_color=ui.BAD)
             return
@@ -189,30 +304,102 @@ class View(ToolView):
         ordered = sorted(groups.values(), key=lambda g: -(len(g) - 1) * g[0][1])
         waste = sum((len(g) - 1) * g[0][1] for g in ordered)
         self.info.configure(text=t("dp_summary", groups=len(ordered), waste=human(waste)), text_color=ui.TEXT)
-        for g in ordered[:MAX_GROUPS_SHOWN]:
-            box = ui.card(self.results)
-            box.pack(fill="x", pady=(0, 8), padx=(0, 8))
-            ctk.CTkLabel(box, text=t("dp_group", n=len(g), size=human(g[0][1])), font=("Segoe UI Semibold", 12),
-                         text_color=ui.TEXT, anchor="w").pack(fill="x", padx=14, pady=(8, 2))
-            for path, size, mtime in sorted(g, key=lambda x: -x[2]):
-                var = ctk.BooleanVar(value=False)
-                self.vars[path] = (var, size, g)
-                line = ctk.CTkFrame(box, fg_color="transparent")
-                line.pack(fill="x", padx=(14, 8), pady=0)
-                ctk.CTkCheckBox(line, text="", variable=var, command=self.update_sel, width=22, checkbox_width=16,
-                                checkbox_height=16, border_width=2, fg_color=ui.ACCENT,
-                                border_color=ui.MUTED).pack(side="left")
-                ctk.CTkLabel(line, text=os.path.basename(path), font=("Segoe UI", 12), text_color=ui.TEXT,
-                             anchor="w").pack(side="left")
-                where = os.path.basename(os.path.dirname(path)) or os.path.dirname(path)
-                ctk.CTkLabel(line, text="   %s   ·   %s" % (time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)), where),
-                             font=("Segoe UI", 11), text_color=ui.MUTED, anchor="w").pack(side="left")
-                icon_button(line, "trash", lambda p=path: self.remove_one(p), ui.MUTED).pack(side="right")
-                icon_button(line, "folder", lambda p=path: reveal(p), ui.MUTED).pack(side="right", padx=(0, 2))
-            ctk.CTkFrame(box, fg_color="transparent", height=6).pack()
-        if len(ordered) > MAX_GROUPS_SHOWN:
-            note(self.results, t("dp_more", n=len(ordered) - MAX_GROUPS_SHOWN))
+        todo = ordered[:MAX_GROUPS_SHOWN]
+
+        def step(i):
+            if token != self.draw_token or not self.winfo_exists():
+                return
+            t0 = time.time()
+            while i < len(todo) and time.time() - t0 < 0.04:
+                self.add_group(todo[i], keep)
+                i += 1
+            if i < len(todo):
+                self.after(30, lambda: step(i))
+            elif len(ordered) > MAX_GROUPS_SHOWN:
+                note(self.results, t("dp_more", n=len(ordered) - MAX_GROUPS_SHOWN))
+        step(0)
         self.update_sel()
+
+    def add_group(self, g, keep=(), key=None):
+        box = ui.card(self.results)
+        box.pack(fill="x", pady=(0, 8), padx=(0, 8))
+        if key is not None:
+            self.cards[key] = box
+        self.fill_group(box, g, keep)
+
+    def fill_group(self, box, g, keep=()):
+        """One card: the picture Windows shows for the file (all copies have the same content, so one is
+        enough), then the copies, newest first, each with reveal and delete icons."""
+        keep = set(keep) | {p for p, (v, _, _) in self.vars.items() if v.get()}
+        for w_ in box.winfo_children():
+            w_.destroy()
+        thumb = ctk.CTkLabel(box, text="", width=THUMB + 8, height=THUMB + 8, fg_color=ui.BG, corner_radius=8)
+        thumb.pack(side="left", anchor="n", padx=(12, 0), pady=10)
+        self.want_thumb(g[0][0], thumb)
+        right = ctk.CTkFrame(box, fg_color="transparent")
+        right.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(right, text=t("dp_group", n=len(g), size=human(g[0][1])), font=("Segoe UI Semibold", 12),
+                     text_color=ui.TEXT, anchor="w").pack(fill="x", padx=10, pady=(8, 2))
+        for path, size, mtime in sorted(g, key=lambda x: -x[2]):
+            var = ctk.BooleanVar(value=path in keep)
+            self.vars[path] = (var, size, g)
+            line = ctk.CTkFrame(right, fg_color="transparent")
+            line.pack(fill="x", padx=(10, 8), pady=0)
+            ctk.CTkCheckBox(line, text="", variable=var, command=self.update_sel, width=22, checkbox_width=16,
+                            checkbox_height=16, border_width=2, fg_color=ui.ACCENT,
+                            border_color=ui.MUTED).pack(side="left")
+            ctk.CTkLabel(line, text=os.path.basename(path), font=("Segoe UI", 12), text_color=ui.TEXT,
+                         anchor="w").pack(side="left")
+            where = os.path.basename(os.path.dirname(path)) or os.path.dirname(path)
+            ctk.CTkLabel(line, text="   %s   ·   %s" % (time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)), where),
+                         font=("Segoe UI", 11), text_color=ui.MUTED, anchor="w").pack(side="left")
+            icon_button(line, "trash", lambda p=path: self.remove_one(p), ui.MUTED).pack(side="right")
+            icon_button(line, "folder", lambda p=path: reveal(p), ui.MUTED).pack(side="right", padx=(0, 2))
+        ctk.CTkFrame(right, fg_color="transparent", height=6).pack()
+
+    # -- pictures, from Windows on a thread of their own ------------------------------------------
+    def want_thumb(self, path, label):
+        if path in self.thumbs:
+            if self.thumbs[path] is not None:
+                label.configure(image=self.thumbs[path])
+            return
+        self.thumb_q.put((path, label))
+        if self.thumb_thread is None:
+            self.thumb_thread = threading.Thread(target=self.thumb_worker, daemon=True)
+            self.thumb_thread.start()
+
+    def thumb_worker(self):
+        from .. import thumbs
+        thumbs.init_thread()
+        while True:
+            path, label = self.thumb_q.get()
+            if path is None:
+                return
+            try:
+                img = thumbs.get(path, THUMB * 2)       # twice the size: sharp on scaled displays
+            except Exception:
+                img = None
+            self.post(self.got_thumb, path, label, img)
+
+    def got_thumb(self, path, label, img):
+        if path not in self.thumbs:
+            if img is None:
+                self.thumbs[path] = None
+            else:
+                k = THUMB / max(img.size)
+                self.thumbs[path] = ctk.CTkImage(light_image=img, dark_image=img,
+                                                 size=(max(1, round(img.width * k)), max(1, round(img.height * k))))
+        try:
+            if self.thumbs[path] is not None and label.winfo_exists():
+                label.configure(image=self.thumbs[path])
+        except Exception:
+            pass
+
+    def destroy(self):
+        if self.job:
+            self.job["stop"] = True
+        self.thumb_q.put((None, None))
+        super().destroy()
 
     def remove_one(self, path):
         group = self.vars[path][2]

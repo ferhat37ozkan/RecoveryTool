@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Changed
+
+- Duplicate Finder compares while it walks the folders (a file is read only when another of the same size
+  was seen), so duplicates are listed as soon as the second copy turns up; progress bar, live counts, Stop.
+  Cards are drawn a few at a time so the window keeps answering. Tests in `tests/test_dupes.py`.
+- Each duplicate group shows the picture Windows Explorer shows for the file (`benchwise.thumbs`,
+  IShellItemImageFactory): image / video / PDF thumbnails where Windows has them, else the type icon.
+
+
 ## 1.6.0
 
 Added
