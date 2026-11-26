@@ -106,7 +106,7 @@ class CardGrid(ctk.CTkScrollableFrame):
 
 
 class Shell(ctk.CTk):
-    def __init__(self, open_tool=None, hidden=False):
+    def __init__(self, open_tool=None, hidden=False, admin_mode=None):
         super().__init__(fg_color=BG)
         # Hidden while the widgets are created and drawn (customtkinter draws every widget on its own
         # canvas, which would show piece by piece); shown in one go at the end of __init__.
@@ -146,7 +146,10 @@ class Shell(ctk.CTk):
         self.show_asked = []        # set from another thread when a second start asks to be shown
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.bind("<Destroy>", lambda e: self.stop_tray() if e.widget is self else None)
+        admin_error = self.admin_apply(admin_mode) if admin_mode in ("on", "off") else None
         self.build()
+        if admin_error:
+            self.after(800, lambda: messagebox.showerror(t("am_name"), t("am_failed", err=admin_error)))
         self.after(2500, self.check_update)
         from . import selfupdate
         selfupdate.cleanup()                        # what an earlier update left behind
@@ -226,11 +229,7 @@ class Shell(ctk.CTk):
         self.crumbs.pack(side="left", padx=(14, 0), pady=(4, 0))
         top = dict(height=28, fg_color=CARD, hover_color=BORDER, border_width=1, border_color=BORDER, text_color=TEXT)
         ctk.CTkButton(bar, text=t("lang"), width=84, command=self.switch_language, **top).pack(side="right")
-        mode = ctk.CTkLabel(bar, text=" " + t("bw_admin_mode" if self.admin else "bw_user_mode"),
-                            image=self.shield(GOOD if self.admin else MUTED), compound="left",
-                            font=("Segoe UI Semibold", 11), text_color=GOOD if self.admin else MUTED,
-                            fg_color=CARD, corner_radius=8, height=28, padx=10)
-        mode.pack(side="right", padx=(0, 8))
+        self.build_admin(bar)
         self.build_passage(bar)
         # Every page and tool view sits in the same cell of the body and stays there; switching only
         # raises one above the others.  Nothing is unmapped and re-laid out, so there is no flicker.
@@ -389,8 +388,7 @@ class Shell(ctk.CTk):
         return [v for v in self.views.values() if getattr(v, "busy", lambda: False)()]
 
     def ask_admin(self, tool):
-        if not messagebox.askyesno(t("bw_admin_title"), t("bw_admin_body", tool=t(tool.key)), icon="warning"):
-            return
+        """Straight to the UAC prompt (Windows asks; no question of our own first), unless a tool is working."""
         if self.busy_views() and not messagebox.askyesno(APP_NAME, t("bw_admin_busy"), icon="warning"):
             return
         from . import livemode
@@ -401,6 +399,75 @@ class Shell(ctk.CTk):
             started = livemode.start_elevated(show=True, open_tool=tool.id)     # no UAC prompt
         if not started and not elevate.restart_as_admin(tool.id):
             return messagebox.showinfo(APP_NAME, t("bw_admin_failed"))
+        self.close_now()
+
+    # -- permanent administrator mode -------------------------------------------------------------
+    # The switch next to Passage: on, a Task Scheduler task ("run with highest privileges", see
+    # benchwise.livemode) starts Benchwise elevated without a UAC prompt, also after a restart.
+    # Changing it needs administrator rights, so a standard copy hands it to an elevated one.
+    def build_admin(self, bar):
+        pill = ctk.CTkFrame(bar, fg_color=CARD, corner_radius=8, border_width=1, border_color=BORDER, height=28)
+        pill.pack(side="right", padx=(0, 8))
+        ctk.CTkLabel(pill, text="", image=self.shield(GOOD if self.admin else MUTED)).pack(side="left", padx=(10, 4))
+        name = ctk.CTkLabel(pill, text=t("am_name"), font=("Segoe UI Semibold", 12), text_color=TEXT, cursor="hand2")
+        name.pack(side="left", padx=(0, 6))
+        name.bind("<Button-1>", lambda e: messagebox.showinfo(t("am_name"), t("am_info")))
+        self.admin_status = ctk.CTkLabel(pill, text="", font=("Segoe UI", 11), text_color=MUTED)
+        self.admin_status.pack(side="left", padx=(0, 4))
+        self.admin_var = tk.BooleanVar(value=False)
+        self.admin_switch = ctk.CTkSwitch(pill, text="", width=40, switch_width=36, switch_height=18,
+                                          variable=self.admin_var, progress_color=GOOD,
+                                          command=lambda: self.admin_toggle(self.admin_var.get()))
+        self.admin_switch.pack(side="left", padx=(0, 6))
+        self.admin_show()
+
+    def admin_show(self):
+        """Switch = the permanent setting; the text says what this window runs as."""
+        from . import livemode
+        if not getattr(self, "admin_status", None) or not self.admin_status.winfo_exists():
+            return
+        on = livemode.enabled()
+        self.admin_var.set(on)
+        if on:
+            text, color = t("am_always"), GOOD
+        elif self.admin:
+            text, color = t("am_session"), GOOD
+        else:
+            text, color = t("am_off"), MUTED
+        self.admin_status.configure(text=text, text_color=color)
+        self.admin_switch.configure(state="normal" if livemode.supported() else "disabled")
+
+    def admin_apply(self, mode):
+        """Switch the permanent mode in this (elevated) copy.  Returns an error text or None."""
+        from . import livemode
+        if not self.admin or not livemode.supported():
+            return None
+        try:
+            if mode == "on":
+                livemode.enable(start_with_windows=livemode.autostart())    # keeps an existing sign-in start
+            else:
+                livemode.disable()
+        except Exception as ex:
+            return str(ex)
+        return None
+
+    def admin_toggle(self, want):
+        from . import livemode
+        if want == livemode.enabled():
+            return self.admin_show()
+        if not messagebox.askyesno(t("am_name"), t("am_ask_on" if want else "am_ask_off"), icon="warning"):
+            return self.admin_show()
+        mode = "on" if want else "off"
+        if self.admin:
+            err = self.admin_apply(mode)
+            if err:
+                messagebox.showerror(t("am_name"), t("am_failed", err=err))
+            return self.admin_show()
+        if self.busy_views() and not messagebox.askyesno(APP_NAME, t("bw_admin_busy"), icon="warning"):
+            return self.admin_show()
+        if not elevate.restart_as_admin(extra=["--always-admin=" + mode]):
+            messagebox.showinfo(APP_NAME, t("bw_admin_failed"))
+            return self.admin_show()
         self.close_now()
 
     # -- Passage (Geçit) --------------------------------------------------------------------------
@@ -798,8 +865,8 @@ def _icon_exe():
     return getattr(sys, "_base_executable", sys.executable)
 
 
-def main(open_tool=None, hidden=False):
+def main(open_tool=None, hidden=False, admin_mode=None):
     forced = os.environ.get("RECOVERYTOOL_LANG")          # "en" or "tr" overrides the Windows language
     i18n.set_language(forced) if forced else i18n.detect()
     ctk.set_appearance_mode("dark")
-    Shell(open_tool, hidden=hidden).mainloop()
+    Shell(open_tool, hidden=hidden, admin_mode=admin_mode).mainloop()

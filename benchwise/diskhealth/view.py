@@ -193,6 +193,7 @@ class DiskHealthView(ctk.CTkFrame):
         line2 = ctk.CTkFrame(row, fg_color="transparent")
         line2.pack(fill="x", pady=(6, 0))
         on = livemode.enabled()
+        getattr(self.winfo_toplevel(), "admin_show", lambda: None)()      # the same task as the top-bar switch
         ctk.CTkLabel(line1, text=t("live_on") if on else t("live_off"), font=("Segoe UI Semibold", 12),
                      text_color=ui.GOOD if on else MUTED, anchor="w").pack(side="left")
         if not livemode.supported():

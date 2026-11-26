@@ -9,6 +9,7 @@ import ctypes.wintypes as w
 import hashlib
 import os
 import stat
+import subprocess
 import time
 from collections import defaultdict
 from tkinter import filedialog
@@ -18,7 +19,7 @@ import customtkinter as ctk
 from recoverytool.i18n import t
 
 from .. import ui
-from ..toolkit import ToolView, card, confirm, human, note, texts
+from ..toolkit import ToolView, card, confirm, human, icon_button, note, texts
 
 texts({
     "dp_how": ("Choose a folder (for example Pictures or Downloads). Only files with exactly the same content are "
@@ -41,6 +42,9 @@ texts({
     "dp_moved": ("Moved {n} files to the Recycle Bin.", "{n} dosya Geri Dönüşüm Kutusu'na taşındı."),
     "dp_group": ("{n} copies · {size} each", "{n} kopya · her biri {size}"),
     "dp_more": ("… and {n} more groups (the largest are shown)", "… ve {n} grup daha (en büyükler gösteriliyor)"),
+    "dp_ask_one": ("Move {name} to the Recycle Bin?\n\n{folder}", "{name} Geri Dönüşüm Kutusu'na taşınsın mı?\n\n{folder}"),
+    "dp_last_copy": ("This is the last copy left of this file; it is kept.", "Bu dosyanın kalan son kopyası bu; silinmez."),
+    "dp_moved_one": ("{name} was moved to the Recycle Bin.", "{name} Geri Dönüşüm Kutusu'na taşındı."),
 })
 
 MAX_GROUPS_SHOWN = 150
@@ -157,10 +161,11 @@ class View(ToolView):
         self.vars, self.groups = {}, {}
 
     def choose(self):
-        folder = filedialog.askdirectory(title=t("dp_choose"))
+        start = getattr(self, "folder", None) or os.path.expanduser("~")
+        folder = filedialog.askdirectory(title=t("dp_choose"), initialdir=start)    # not the program's own folder
         if not folder:
             return
-        self.folder = folder
+        self.folder = folder = os.path.normpath(folder)
         self.choose_btn.configure(state="disabled")
 
         def progress(kind, a, b):
@@ -192,14 +197,46 @@ class View(ToolView):
             for path, size, mtime in sorted(g, key=lambda x: -x[2]):
                 var = ctk.BooleanVar(value=False)
                 self.vars[path] = (var, size, g)
-                ctk.CTkCheckBox(box, text="%s   ·   %s" % (path, time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))),
-                                variable=var, command=self.update_sel, font=("Segoe UI", 11), text_color=ui.TEXT,
-                                checkbox_width=16, checkbox_height=16, border_width=2, fg_color=ui.ACCENT,
-                                border_color=ui.MUTED).pack(anchor="w", padx=14, pady=1)
+                line = ctk.CTkFrame(box, fg_color="transparent")
+                line.pack(fill="x", padx=(14, 8), pady=0)
+                ctk.CTkCheckBox(line, text="", variable=var, command=self.update_sel, width=22, checkbox_width=16,
+                                checkbox_height=16, border_width=2, fg_color=ui.ACCENT,
+                                border_color=ui.MUTED).pack(side="left")
+                ctk.CTkLabel(line, text=os.path.basename(path), font=("Segoe UI", 12), text_color=ui.TEXT,
+                             anchor="w").pack(side="left")
+                where = os.path.basename(os.path.dirname(path)) or os.path.dirname(path)
+                ctk.CTkLabel(line, text="   %s   ·   %s" % (time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime)), where),
+                             font=("Segoe UI", 11), text_color=ui.MUTED, anchor="w").pack(side="left")
+                icon_button(line, "trash", lambda p=path: self.remove_one(p), ui.MUTED).pack(side="right")
+                icon_button(line, "folder", lambda p=path: reveal(p), ui.MUTED).pack(side="right", padx=(0, 2))
             ctk.CTkFrame(box, fg_color="transparent", height=6).pack()
         if len(ordered) > MAX_GROUPS_SHOWN:
             note(self.results, t("dp_more", n=len(ordered) - MAX_GROUPS_SHOWN))
         self.update_sel()
+
+    def remove_one(self, path):
+        group = self.vars[path][2]
+        left = [x for x in group if os.path.exists(x[0])]
+        if len(left) < 2:
+            self.info.configure(text=t("dp_last_copy"), text_color=ui.WARN)
+            return
+        name = os.path.basename(path)
+        if not confirm(t("tool_dupes"), t("dp_ask_one", name=name, folder=os.path.dirname(path))):
+            return
+        ok = to_recycle_bin([path]) and not os.path.exists(path)
+        self.forget({path} if ok else set())
+        self.info.configure(text=t("dp_moved_one", name=name) if ok else "SHFileOperation failed",
+                            text_color=ui.GOOD if ok else ui.BAD)
+
+    def forget(self, moved):
+        """Drop removed files from the groups (a group of one is no longer a duplicate) and redraw."""
+        for key in list(self.groups):
+            self.groups[key] = [x for x in self.groups[key] if x[0] not in moved]
+            if len(self.groups[key]) < 2:
+                del self.groups[key]
+        info, color = self.info.cget("text"), self.info.cget("text_color")
+        self.show(self.groups)
+        self.info.configure(text=info, text_color=color)
 
     def select(self, keep_newest):
         for path, (var, size, group) in self.vars.items():
@@ -236,11 +273,9 @@ class View(ToolView):
         ok = to_recycle_bin(paths)
         msg = t("dp_moved", n=len(paths)) + ("\n" + t("dp_keep_one") if kept else "")
         self.info.configure(text=msg if ok else "SHFileOperation failed", text_color=ui.GOOD if ok else ui.BAD)
-        moved = {p for p in paths if not os.path.exists(p)}
-        for key in list(self.groups):
-            self.groups[key] = [x for x in self.groups[key] if x[0] not in moved]
-            if len(self.groups[key]) < 2:
-                del self.groups[key]
-        info = self.info.cget("text")
-        self.show(self.groups)
-        self.info.configure(text=info)
+        self.forget({p for p in paths if not os.path.exists(p)})
+
+
+def reveal(path):
+    """Open Explorer at the file's folder with the file selected."""
+    subprocess.Popen('explorer.exe /select,"%s"' % os.path.normpath(path))

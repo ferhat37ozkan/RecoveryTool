@@ -216,6 +216,21 @@ def scroll_body(view):
     return sf
 
 
+_icons = {}
+
+
+def icon_button(parent, name, command, color=MUTED, size=16):
+    """A small borderless button showing one of the ``benchwise.art`` drawings."""
+    key = (name, color, size)
+    if key not in _icons:
+        from . import art
+        rgb = tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+        pil = art.badge(name, size * 2, rgb)
+        _icons[key] = ctk.CTkImage(light_image=pil, dark_image=pil, size=(size, size))
+    return ctk.CTkButton(parent, text="", image=_icons[key], command=command, width=size + 12, height=size + 10,
+                         fg_color="transparent", hover_color=BORDER, corner_radius=6)
+
+
 def human(n):
     n = float(n or 0)
     for unit in ("B", "KB", "MB", "GB", "TB"):

@@ -1,6 +1,7 @@
 """How the Benchwise window starts (shared by run.py and ``python -m benchwise``).
 
 Window flags:  --open=<tool id>  open a tool at once
+               --always-admin=on|off  (elevated copy) switch the permanent administrator mode
                --task            started by the live-monitoring task (hidden unless a click asked)
                --wait            a copy that is just closing may still hold the single-instance lock
                --tray            started at sign-in because Passage is on: hidden, only next to the clock
@@ -12,12 +13,13 @@ import sys
 
 
 def is_window_start(args):
-    return all(a.startswith("--open=") or a in ("--task", "--wait", "--tray") for a in args)
+    return all(a.startswith(("--open=", "--always-admin=")) or a in ("--task", "--wait", "--tray") for a in args)
 
 
 def run_window(args):
     from . import elevate, instance, livemode
     open_tool = next((a.split("=", 1)[1] for a in args if a.startswith("--open=")), None)
+    admin_mode = next((a.split("=", 1)[1] for a in args if a.startswith("--always-admin=")), None)
     task = "--task" in args
     hidden = "--tray" in args
     if task:
@@ -57,7 +59,7 @@ def run_window(args):
                 return 0
             instance.acquire()
     from .shell import main
-    main(open_tool=open_tool, hidden=hidden)
+    main(open_tool=open_tool, hidden=hidden, admin_mode=admin_mode)
     return 0
 
 

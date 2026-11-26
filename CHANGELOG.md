@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 1.6.0
+
+Added
+
+- **Image & Clone rebuilt** (`benchwise.tools.image`). Backup writes a fixed VHD (raw data + 512-byte
+  footer, CHS per the VHD spec); a partition image gets a 1 MiB MBR in front so it mounts as a disk.
+  Needed vs free space is checked live. Restore mounts .vhd/.vhdx/.iso with `Mount-DiskImage
+  -NoDriveLetter` and gives the largest volume the chosen free letter through `Win32_Volume`; several
+  images, eject, read-only by default, list kept in settings (`image_mounts`). Tests in `tests/test_image.py`.
+- **Administrator switch** in the top bar: registers / removes the existing live-mode task
+  (`benchwise.livemode`, highest privileges) so Benchwise always starts elevated without UAC. A standard
+  copy hands the change to an elevated one (`--always-admin=on|off`).
+- `toolkit.icon_button`; `folder`, `trash`, `eject` drawings in `benchwise.art`.
+
+Changed
+
+- Duplicate Finder shows file names with reveal and delete icons; the folder picker starts in the home folder.
+- Opening an admin tool goes straight to UAC (the confirmation box is gone; a busy tool still asks).
+- The locked clone / restore-to-disk buttons were removed.
+
 ## 1.5.0
 
 Added

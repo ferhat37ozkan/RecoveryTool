@@ -6,8 +6,25 @@ i18n.STRINGS.update({
     # --- window ---
     "bw_home": ("Home", "Ana sayfa"),
     "bw_tagline": ("Tools for your disks, hardware and Windows", "Diskleriniz, donanımınız ve Windows için araçlar"),
-    "bw_admin_mode": ("Administrator", "Yönetici modu"),
-    "bw_user_mode": ("Standard mode", "Standart mod"),
+    "am_name": ("Administrator", "Yönetici"),
+    "am_always": ("always", "her zaman"),
+    "am_session": ("this time", "bu oturum"),
+    "am_off": ("off", "kapalı"),
+    "am_info": ("On: Benchwise always opens with administrator rights, without a UAC prompt, also after the "
+                "computer restarts. Tools with a shield then open at once.\n\nOff: Windows asks (UAC) when such "
+                "a tool is opened.",
+                "Açık: Benchwise her zaman yönetici yetkisiyle, UAC sormadan açılır; bilgisayar yeniden başlasa da. "
+                "Kalkan işaretli araçlar doğrudan açılır.\n\nKapalı: Böyle bir araç açılınca Windows sorar (UAC)."),
+    "am_ask_on": ("Always run Benchwise as administrator, without asking, also after a restart?\n\n"
+                  "Windows asks once now. Keep Benchwise.exe in a permanent folder (not Downloads): the exe in "
+                  "that folder will start with administrator rights without asking.",
+                  "Benchwise her zaman, sormadan yönetici olarak çalışsın mı (yeniden başlatmadan sonra da)?\n\n"
+                  "Windows şimdi bir kez sorar. Benchwise.exe'yi kalıcı bir klasörde tutun (İndirilenler değil): "
+                  "o klasördeki exe sormadan yönetici yetkisiyle açılır."),
+    "am_ask_off": ("Stop running Benchwise as administrator all the time?\n\nTools with a shield will ask (UAC) again.",
+                   "Benchwise artık her zaman yönetici olarak çalışmasın mı?\n\nKalkan işaretli araçlar yeniden "
+                   "soracak (UAC)."),
+    "am_failed": ("The administrator mode could not be changed: {err}", "Yönetici modu değiştirilemedi: {err}"),
     "bw_admin_tip": ("Tools marked with a shield need administrator rights.",
                      "Kalkan işaretli araçlar yönetici yetkisi ister."),
     "bw_soon": ("Coming soon", "Yakında"),
@@ -17,10 +34,6 @@ i18n.STRINGS.update({
     "bw_soon_title": ("Coming soon", "Yakında"),
     "bw_soon_body": ("{tool} is planned but not built yet.", "{tool} planlandı ama henüz hazır değil."),
     "bw_admin_title": ("Administrator rights needed", "Yönetici yetkisi gerekiyor"),
-    "bw_admin_body": ("{tool} needs administrator rights to work with your hardware directly.\n\n"
-                      "Restart Benchwise as administrator and open {tool}?",
-                      "{tool}, donanımınıza doğrudan erişebilmek için yönetici yetkisine ihtiyaç duyar.\n\n"
-                      "Benchwise yönetici olarak yeniden başlatılsın ve {tool} açılsın mı?"),
     "bw_admin_busy": ("A tool is still working. Restarting stops it.\n\nRestart anyway?",
                       "Bir araç hâlâ çalışıyor. Yeniden başlatmak onu durdurur.\n\nYine de yeniden başlatılsın mı?"),
     "bw_admin_failed": ("Benchwise was not restarted as administrator (the request was declined).",
@@ -343,7 +356,7 @@ i18n.STRINGS.update({
     "tool_repair_d": ("Filesystem check, boot sector and partition table repair",
                       "Dosya sistemi kontrolü, önyükleme sektörü ve bölüm tablosu onarımı"),
     "tool_image": ("Image & Clone", "İmaj ve Klonlama"),
-    "tool_image_d": ("Copy a disk to an image file or to another disk", "Bir diski imaj dosyasına veya başka bir diske kopyalayın"),
+    "tool_image_d": ("Back up a disk to an image file, mount images as drives", "Diski imaj dosyasına yedekleyin, imajları sürücü olarak bağlayın"),
     "tool_partitions": ("Partitions", "Bölümler"),
     "tool_partitions_d": ("Create, delete and format partitions; back up the table",
                           "Bölüm oluşturun, silin, biçimlendirin; tabloyu yedekleyin"),
